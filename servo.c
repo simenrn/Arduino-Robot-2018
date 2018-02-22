@@ -50,23 +50,27 @@ void vServo_init(uint8_t servoAngleDeg){
     /* Clear OCnA/OCnB on Compare Match, set */
     /* OCnA/OCnB at BOTTOM (non-inverting mode) */
     /* Datasheet p.132 Table 14-3 */
-    TCCR1A |= (1<<COM1A1) | (0<<COM0A0);
+    TCCR4B |= (1<<COM1A1) | (0<<COM0A0);
     
     /* Waveform generation mode 14: Fast PWM */
     /* top: ICRn, Update bottom, flag set on top */
     /* Datasheet p.133 Table 14-5 */
-    TCCR1B |= (1<<WGM13) | (1<<WGM12);
-    TCCR1A |= (1<<WGM11) | (0<<WGM10);
+
+    //TCCR1B |= (1<<WGM13) | (1<<WGM12);                                                   //USIKKER HER, KOMMENTERTE DENNE UT OG LA INN 4A ISTEDET
+    TCCR4A |= (1<<WGM13) | (1<<WGM12);
+    TCCR4B |= (1<<WGM11) | (0<<WGM10);
 
     /* Clock select bit description: */
     /* clkI/O/8 (From prescaler) - Datasheet p.134 Table 14-6*/
-    TCCR1B |= (0<<CS12) | (1<<CS11) | (0<<CS10);
+
+    //TCCR1B |= (0<<CS12) | (1<<CS11) | (0<<CS10);
+     TCCR4A |= (0<<CS12) | (1<<CS11) | (0<<CS10);                                           //SAMME SOM KOMMENTAR OVER
     
     /* 50Hz 20ms period => 16Mhz/(8clk*50Hz) - 1 = ICR1] */
     /* Datasheet p.125 */
-    ICR1 = 39999; // 49999 for 20mhz, 39 999 for 16mhz
+    ICR1 = 39999; // 49999 for 20mhz, 39 999 for 16Mhz                                      //VET IKKE HVA DENNE GJØR s160ish i datablad
     
-    /*PortB Pin 5 as servo PWM Output (OC1A)*/
+    /*PortH Pin 7 as servo PWM Output (OC4B)*/
     servoReg |= (1<<servoPin);
     
     /*  Set angle to desired start angle (usually 0)*/

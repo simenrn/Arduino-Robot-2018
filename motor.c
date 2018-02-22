@@ -32,16 +32,16 @@
 /************************************************************************/
 void vMotor_init(){
     /* Initialize motor pins as output */
-    DDRC |= (1<<motorLeftBackward) | (1<<motorLeftForward);
-    DDRH |= (1<<motorRightOn);
-    DDRA |= (1<<motorRightForward) | (1<<motorRightBackward); 
-    DDRE |= (1<<motorLeftOn);
+    DDRB |= (1<<motorLeftOn);
+    DDRB |= (1<<motorLeftBackward) | (1<<motorLeftForward);
+    DDRB |= (1<<motorRightOn);
+    DDRH |= (1<<motorRightForward) | (1<<motorRightBackward); 
     
     /* Set motor high and direction low to ensure zero movement */
-    PORTH &= ~(1<<motorLeftOn);
-    PORTE &= ~(1<<motorRightOn);
-    PORTA &= ~(1<<motorRightBackward) & ~(1<<motorRightForward);
-    PORTC &= ~(1<<motorLeftForward) & ~(1<<motorLeftBackward);
+    PORTB &= ~(1<<motorLeftOn);
+    PORTB &= ~(1<<motorRightOn);
+    PORTH &= ~(1<<motorRightBackward) & ~(1<<motorRightForward);
+    PORTB &= ~(1<<motorLeftForward) & ~(1<<motorLeftBackward);
     
     /* Initialize motor encoder pins as input */
     DDRD &= ~((1<<encoderPinRight) & (1<<encoderPinLeft));
@@ -56,7 +56,7 @@ void vMotor_init(){
 
     /* Set interrupt to trigger on rising edge for motor and any change for dongle */
     /* Datasheet p110-11 table 15-1,3 */
-    EICRA |= (1<<ISC21) | (1<<ISC20) | (1<<ISC31) | (1<<ISC30);
+    EICRA |= (1<<ISC21) | (1<<ISC20) | (1<<ISC31) | (1<<ISC30);                             //MÅ KANKJSE SJEKKE UT DENNE NØYERE
     EICRB |= (1<<ISC40);
     
     /* Clear interrupt flag for INT2, 3 and 4 */
@@ -69,81 +69,81 @@ void vMotor_init(){
     /* Clear OCnA/OCnB on Compare Match, set */
     /* OCnA/OCnB at BOTTOM (non-inverting mode) */
     /* Datasheet p.132 Table 14-3 */    
-    TCCR0A |= (1<<COM0A1) | (0<<COM0A0) | (1<<COM0B1) | (0<<COM0B0);
+    TCCR1B |= (1<<COM0A1) | (0<<COM0A0) | (1<<COM0B1) | (0<<COM0B0);
     
     /* Waveform generation mode 3: Fast 8bit PWM */
     /* Top 0x00FF, Update bottom, flag set on top */
     /* Datasheet p.133 Table 14-5 */
-    TCCR0A |= (1<<WGM01) | (1<<WGM00);
-    TCCR0B |= (0<<WGM02);
+    TCCR1B |= (1<<WGM01) | (1<<WGM00);
+    TCCR0A |= (0<<WGM02);
     
    
 
 
     /* Clock select bit description: */
     /* clkI/O/8 (From prescaler) - Datasheet p.157 Table 17-6*/
-    TCCR0B |= (1<<CS02) | (0<<CS01) | (1<<CS00);
+    TCCR0A |= (1<<CS02) | (0<<CS01) | (1<<CS00);
     
     /* Datasheet p.125 */
-    /*PortB7&G5 PWM Output (OC0A & OC0B)*/
+    /*PortB7&G5 PWM Output (OC0A & OC0B)
     DDRB |= (1<<motorRightOn); // OC0A
-    DDRG |= (1<<motorLeftOn);   // OC0B
+    DDRG |= (1<<motorLeftOn);   // OC0B*/                                                   //KANSKJE IKKE KOMMENTERE UT DENNE!
 }
 
 void vMotorMoveLeftForward(uint8_t actuation, uint8_t *leftWheelDirection){
     motorLeftPWM = actuation;
-    PORTC |= (1<<motorLeftForward);
-    PORTC &= ~(1<<motorLeftBackward);
+    PORTB |= (1<<motorLeftForward);
+    PORTB &= ~(1<<motorLeftBackward);
     *leftWheelDirection = motorLeftForward;
 }
 void vMotorMoveRightForward(uint8_t actuation, uint8_t *rightWheelDirection){
     motorRightPWM = actuation;
-    PORTA |= (1<<motorRightForward);
-    PORTA &= ~(1<<motorRightBackward);
+    PORTH |= (1<<motorRightForward);
+    PORTH &= ~(1<<motorRightBackward);
     *rightWheelDirection = motorRightForward;
 }
 
 void vMotorMoveLeftBackward(uint8_t actuation, uint8_t *leftWheelDirection){
     motorLeftPWM = actuation;
-    PORTC &= ~(1<<motorLeftForward);
-    PORTC |= (1<<motorLeftBackward);
+    PORTB &= ~(1<<motorLeftForward);
+    PORTB |= (1<<motorLeftBackward);
     *leftWheelDirection = motorLeftBackward;
 }
 void vMotorMoveRightBackward(uint8_t actuation, uint8_t *rightWheelDirection){
     motorRightPWM = actuation;
-    PORTA &= ~(1<<motorRightForward);
-    PORTA |= (1<<motorRightBackward);
+    PORTH &= ~(1<<motorRightForward);
+    PORTH |= (1<<motorRightBackward);
     *rightWheelDirection = motorRightBackward;
 }
 
 void vMotorBrakeLeft(){
     motorLeftPWM = 255;
     //PORTE |= (1<<motorLeftOn);
-    PORTC &= ~(1<<motorLeftForward);
-    PORTC &= ~(1<<motorLeftBackward);
+    PORTB &= ~(1<<motorLeftForward);
+    PORTB &= ~(1<<motorLeftBackward);
     /* Do not set any direction to motor here, it can overshoot */
 }
 
 void vMotorGlideLeft(){
     motorLeftPWM = 0;
     //PORTE &= ~(1<<motorLeftOn);
-    PORTC &= ~(1<<motorLeftForward);
-    PORTC &= ~(1<<motorLeftBackward);
+    PORTB &= ~(1<<motorLeftForward);
+    PORTB &= ~(1<<motorLeftBackward);
 }
 
 void vMotorBrakeRight(){
     motorRightPWM = 255;
     //PORTH |= (1<<motorRightOn);
-    PORTA &= ~(1<<motorRightForward);
-    PORTA &= ~(1<<motorRightBackward);
+    PORTH &= ~(1<<motorRightForward);
+    PORTH &= ~(1<<motorRightBackward);
     /* Do not set any direction to motor here, it can overshoot */
 }
 
 void vMotorGlideRight(){
     motorRightPWM = 0;
     //PORTH &= ~(1<<motorRightOn);
-    PORTA &= ~(1<<motorRightForward);
-    PORTA &= ~(1<<motorRightBackward);
+    PORTH &= ~(1<<motorRightForward);
+    PORTH &= ~(1<<motorRightBackward);
 }
 
 /* Switch for robot movement to abstract the logic away from main */
