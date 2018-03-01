@@ -25,15 +25,15 @@
 // See line 84
 //
 // HARDWARE SETUP
-//  Servo pin:  Port B pin 5
+//  Servo pin:  Port H pin 4
 //  Sensor pins: Port F pin 0 - 4
-//  Motor pins: Port C, pin 5 & 7 and Port H pin 3. Port A pin 2 & 4 and Port E pin 3.
+//  Motor pins: Port B, pin 4 & 5 & 6 & 7 and Port H pin 5 & 6.
 //  Encoder pins: Port D pin 2 & 3
 //
 // TIMERS USED:
-//  Timer0  motorRightPWM   (OCR0B)
+//  Timer0  motorRightPWM   (OCR1B)
 //  Timer0  motorLeftPWM    (OCR0A)
-//  Timer1  ServoPWM        (OCR1A)
+//  Timer1  ServoPWM        (OCR4B)
 //  Timer3 FreeRTOS time slicer
 //
 // Interrupt routines located after main function
@@ -53,7 +53,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
-
+#include <util/delay.h>
 /* Semaphore handles */
 SemaphoreHandle_t xScanLock;
 SemaphoreHandle_t xPoseMutex;
@@ -124,10 +124,10 @@ struct sCartesian{
 
 /*#define tictoc*/
 #ifdef tictoc
-    // Pin for timing tasks, use tic/toc - PINH5 (Arduino 8) is available
-    #define usetictoc DDRH |= (1<<PINH5)
-    #define tic PORTH |= (1<<PINH5)
-    #define toc PORTH &= ~(1<<PINH5)
+    // Pin for timing tasks, use tic/toc - PING5 (Arduino 4) is available
+    #define usetictoc DDRG |= (1<<PING5)
+    #define tic PORTG |= (1<<PING5)
+    #define toc PORTG &= ~(1<<PING5)
 #endif
 
 /*  Communication task */
@@ -599,8 +599,8 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float compassOffset = 0.0;
     
     // Found by using calibration task
-    int16_t xComOff = 11; 
-    int16_t yComOff = -78;
+    //int16_t xComOff = 11;																					KOMMENTERT UT FOR Å IKKE BRUKE KOMPASS
+    //int16_t yComOff = -78;																				KOMMENTERT UT FOR Å IKKE BRUKE KOMPASS
     
     float variance_gyro = 0.0482f; // [rad] calculated offline, see report
     float variance_encoder = (2.0f * WHEEL_FACTOR_MM) / (WHEELBASE_MM / 2.0f); // approximation, 0.0257 [rad]
@@ -608,7 +608,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float variance_gyro_encoder = (variance_gyro + variance_encoder) * period_in_S; // (Var gyro + var encoder) * timestep
     float covariance_filter_predicted = 0;
     
-    #define CONST_VARIANCE_COMPASS 0.3490f
+    // #define CONST_VARIANCE_COMPASS 0.3490f																KOMMENTERT UT FOR Å IKKE BRUKE KOMPASS
     
 
     float gyroWeight = 0.5;//encoderError / (encoderError + gyroError);
@@ -643,20 +643,12 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             float dRight =(float)(rightWheelTicks - previous_ticksRight) * WHEEL_FACTOR_MM; // Distance right wheel has traveled since last sample
             previous_ticksLeft = leftWheelTicks;
             previous_ticksRight = rightWheelTicks;
-            
-			
-			
-					   
+            				   
 					   
             float dRobot = (dLeft + dRight) / 2;           
             float dTheta = (dRight - dLeft) / WHEELBASE_MM; // Get angle from encoders, dervied from arch of circles formula
             
-			
-			
-			
-			
-			
-            
+  
             /* PREDICT */
             // Get gyro data:
             float gyrZ = (fIMU_readFloatGyroZ() - gyroOffset);
@@ -674,8 +666,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             }
             
             gyrZ *= period_in_S * DEG2RAD; // Scale gyro measurement      
-            
-			
+           		
 			
             // Fuse heading from sensors to predict heading:
             dTheta =  (1 - gyroWeight) * dTheta + gyroWeight * gyrZ;
@@ -692,7 +683,54 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             // Predicted (a priori) estimate covariance
             covariance_filter_predicted += variance_gyro_encoder;
             
-            /* UPDATE */
+            
+            //kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
+            ///* Commented back in due to fixed encoder
+            if ((robot_is_turning == FALSE) && (dRobot == 0)){
+                // Updated (a posteriori) state estimate
+                kalmanGain = covariance_filter_predicted;
+                vLED_singleHigh(ledYELLOW);
+            }
+            else{
+                kalmanGain = 0;
+                vLED_singleLow(ledYELLOW);
+            }            
+            //*/
+           
+            predictedTheta  += kalmanGain;
+			vFunc_Inf2pi(&predictedTheta);            
+            
+            // Updated (a posteriori) estimate covariance
+            covariance_filter_predicted = (1 - kalmanGain) * covariance_filter_predicted;  
+
+			
+
+            // Update pose
+            xSemaphoreTake(xPoseMutex, 15 / portTICK_PERIOD_MS);
+                gTheta_hat = predictedTheta;
+                gX_hat = predictedX;
+                gY_hat = predictedY;
+            xSemaphoreGive(xPoseMutex);
+            // Send semaphore to controller
+            xSemaphoreGive(xControllerBSem);
+        }
+        else{
+            // Not connected, getting heading and gyro bias
+            uint16_t i;
+            uint16_t samples = 100;
+            float gyro = 0;
+            for (i = 0; i<=samples; i++){
+                gyro+= fIMU_readFloatGyroZ();
+			}
+            
+            
+            // Initialize pose to 0 and reset offset variables
+            predictedX = 0;
+            predictedY = 0;
+            predictedTheta = 0;
+            gyroOffset = gyro / (float)i;               
+			
+            /* UPDATE 
             // Get compass data: ( Request and recheck after 6 ms?)
             int16_t xCom, yCom, zCom;
             vCOM_getData(&xCom, &yCom, &zCom);
@@ -724,7 +762,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 kalmanGain = 0;
                 vLED_singleLow(ledYELLOW);
             }            
-            //*/
+            //
            
             predictedTheta  += kalmanGain*(error);
 			vFunc_Inf2pi(&predictedTheta);            
@@ -764,7 +802,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             predictedTheta = 0;
             
             compassOffset = atan2(yCom, xCom);    
-            gyroOffset = gyro / (float)i;               
+            gyroOffset = gyro / (float)i;    */           
         }
     } // While(1) end
 }
@@ -814,7 +852,7 @@ void vMainMovementTask( void *pvParameters ){
 
 
 //#define COMPASS_CALIBRATE
-
+/*
 #ifdef COMPASS_CALIBRATE
 void compassTask(void *par){
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -938,7 +976,7 @@ void compassTask(void *par){
     }
 }
 #endif
-
+*/
 /*  In case of stack overflow, disable all interrupts and handle it  */
 void vApplicationStackOverflowHook(TaskHandle_t *pxTask, signed char *pcTaskName){
     cli();
@@ -986,17 +1024,25 @@ int main(void){
     #ifdef DEBUG
         debug("IMU init..\n");
     #endif
+	vLED_singleHigh(ledGREEN);
     sIMU_begin(); 
-   
+   vLED_singleLow(ledGREEN);
     /* Initialize compass */
     /* Connected with I2C, if the chip has no power, MCU will lock. */
     #ifdef DEBUG
             debug("Compass init..\n");
     #endif
-    
-    vCOM_init();
-    
+    vLED_singleHigh(ledYELLOW);
+   // vCOM_init();
+    vLED_singleLow(ledYELLOW);
     /* Initialize RTOS utilities  */
+	
+	
+	// TESTING
+
+	
+	
+	
     movementQ = xQueueCreate(2,sizeof(uint8_t)); // For sending movements to vMainMovementTask
     poseControllerQ = xQueueCreate(1, sizeof(struct sPolar)); // For setpoints to controller
     scanStatusQ = xQueueCreate(1,sizeof(uint8_t)); // For robot status
@@ -1013,7 +1059,7 @@ int main(void){
     xTaskCreate(vMainMovementTask, "Movement", 300, NULL, 4, NULL); // Independent task, uses ticks from ISR
     xTaskCreate(vMainCommunicationTask, "Comm", 300, NULL, 3, NULL); // Dependant on ISR from UART, sends instructions to other tasks
     
-    #ifndef COMPASS_CALIBRATE // If compass calibration task is running dont use these tasks
+  /*  #ifndef COMPASS_CALIBRATE // If compass calibration task is running dont use these tasks
         xTaskCreate(vMainPoseControllerTask, "PoseCon", 300, NULL, 2, NULL); // Dependant on estimator, sends instructions to movement task
         xTaskCreate(vMainPoseEstimatorTask, "PoseEst", 300, NULL, 5, NULL); // Independent task, uses ticks from ISR
         xTaskCreate(vMainSensorTowerTask,"Tower",300, NULL, 1, NULL); // Independent task, but use pose updates from estimator
@@ -1025,7 +1071,7 @@ int main(void){
         debug("Connect to begin!\n");
         xTaskCreate(compassTask, "compasscal", 3500, NULL, 3, NULL); // Task used for compass calibration, dependant on communication and movement task
     #endif
-    
+    */
     
 
     sei();
@@ -1033,14 +1079,16 @@ int main(void){
     #ifdef DEBUG
     debug("Starting scheduler ....\n");
     #endif
-    /*  Start scheduler */
+    //  Start scheduler 
     vTaskStartScheduler();
 
-    /*  MCU is out of RAM if the program comes here */
+    //  MCU is out of RAM if the program comes here 
     while(1){
         cli();
         debug("RAM fail\n");
     }
+	
+	
 }
 
 

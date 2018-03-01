@@ -26,14 +26,14 @@
  */
 
 #define WHEELBASE_MM             147.0 /* Length between wheel centers  */
-#define ROBOT_TOTAL_WIDTH_MM     180 /* From outer rim to outer rim   */
-#define ROBOT_TOTAL_LENGTH_MM    245 /* From front to aft, total      */
-#define ROBOT_AXEL_OFFSET_MM     56  /* From center of square         */
-#define SENSOR_TOWER_OFFSET_X_MM 56  /* From center of square         */ 
-#define SENSOR_TOWER_OFFSET_Y_MM 0   /* From center of square         */
-#define SENSOR_OFFSET_RADIUS_MM  21  /* From center of tower          */
-#define ROBOT_DEADLINE_MS        200 /* Interval between measurements */
-#define SENSOR1_HEADING_DEG      0   /* Sensor angle relative to body */
+#define ROBOT_TOTAL_WIDTH_MM     180 /* From outer rim to outer rim		*/
+#define ROBOT_TOTAL_LENGTH_MM    245 /* From front to aft, total		*/
+#define ROBOT_AXEL_OFFSET_MM     56  /* From center of square			*/
+#define SENSOR_TOWER_OFFSET_X_MM 56  /* From center of square			*/ 
+#define SENSOR_TOWER_OFFSET_Y_MM 0   /* From center of square			*/
+#define SENSOR_OFFSET_RADIUS_MM  21  /* From center of tower			*/
+#define ROBOT_DEADLINE_MS        200 /* Interval between measurements	*/
+#define SENSOR1_HEADING_DEG      0   /* Sensor angle relative to body	*/
 #define SENSOR2_HEADING_DEG      90
 #define SENSOR3_HEADING_DEG      180
 #define SENSOR4_HEADING_DEG      270
@@ -50,7 +50,7 @@ with 8 tick per rotation.
 -> (2*pi*39mm)/(48/1*8) = 0.6380 mm/tick - Length the robot travels per
 										   divided tick
 
-(Ticks are divided in motor.c)              						   */
+(Ticks are divided in motor.c)              							*/
 
 /************************************************************************/
 /* Program settings                                                     */
@@ -73,10 +73,10 @@ with 8 tick per rotation.
 /* Distance sensor                                                      */
 #define distSensPort    PORTF   /* Sensors connected to port A          */
 #define distSensReg     DDRF    /* Port A register used                 */
-#define distSensLeft    PINF1   /* Left sensor connected to PF1      */
+#define distSensLeft    PINF1   /* Left sensor connected to PF1			*/
 #define distSensRear    PINF3   /* Backward sensor connected to PF3     */
 #define distSensRight   PINF2   /* Right sensor connected to PF2        */
-#define distSensFwd     PINF0   /* Forward sensor connected to PF0         */
+#define distSensFwd     PINF0   /* Forward sensor connected to PF0      */
 
 /* Motor control                                                        */
 #define motorRightOn        PINB6
@@ -98,7 +98,7 @@ with 8 tick per rotation.
 
 /* Servo                                                                */
 #define servoReg        DDRH        /* Port H register used             */
-#define servoPin        PINH4       /* Servo connected to pin H4         */
+#define servoPin        PINH4       /* Servo connected to pin H4        */
 #define servoOCR        OCR4B       /* Output compare register for PH4  */
 
 /* LED                                                                  */

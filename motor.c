@@ -65,29 +65,35 @@ void vMotor_init(){
     /* Enable interrupts for INT2, 3 and 4 */
     EIMSK |= (1<<INT2) | (1<<INT3) | (1<<INT4);
     
-    /* Set up PWM for motors */
+    /* Set up PWM for left motor connected to OC0A (8bit PWM) and right motor */
+	/* connected to OC1B (16bit PWM)
     /* Clear OCnA/OCnB on Compare Match, set */
     /* OCnA/OCnB at BOTTOM (non-inverting mode) */
     /* Datasheet p.132 Table 14-3 */    
-    TCCR1B |= (1<<COM0A1) | (0<<COM0A0) | (1<<COM0B1) | (0<<COM0B0);
-    
+    TCCR0A |= (1<<COM0A1) | (0<<COM0A0);
+    TCCR1A |= (1<<COM1B1) | (0<<COM1B1);
     /* Waveform generation mode 3: Fast 8bit PWM */
     /* Top 0x00FF, Update bottom, flag set on top */
     /* Datasheet p.133 Table 14-5 */
-    TCCR1B |= (1<<WGM01) | (1<<WGM00);
-    TCCR0A |= (0<<WGM02);
+	TCCR0B |= (0<<WGM02);
+    TCCR0A |= (1<<WGM01) | (1<<WGM00);
+	
+	TCCR1B |= (0<<WGM13) | (1<<WGM12);
+	TCCR1A |= (0<<WGM11) | (1<<WGM10);
     
-   
-
-
     /* Clock select bit description: */
     /* clkI/O/8 (From prescaler) - Datasheet p.157 Table 17-6*/
-    TCCR0A |= (1<<CS02) | (0<<CS01) | (1<<CS00);
-    
-    /* Datasheet p.125 */
-    /*PortB7&G5 PWM Output (OC0A & OC0B)
-    DDRB |= (1<<motorRightOn); // OC0A
-    DDRG |= (1<<motorLeftOn);   // OC0B*/                                                   //KANSKJE IKKE KOMMENTERE UT DENNE!
+    TCCR0B |= (0<<CS02) | (1<<CS01) | (0<<CS00);
+	TCCR1B |= (0<<CS12) | (1<<CS11) | (0<<CS10); 
+	
+	/* Set other motorpins to normal operation mode (connected to PWM ports)	*/
+	/* Datasheet p.155 Table 17-3												*/
+	
+	TCCR1A |= (0<<COM1A1) | (0<<COM1A0); // MC_IN1 left backwards connected to OC1A
+	TCCR2A |= (0<<COM2A1) | (0<<COM2A0); // MC_IN1 left backwards connected to OC2A
+	TCCR2A |= (0<<COM2B1) | (0<<COM2B0); // MC_IN1 left backwards connected to OC2B
+	TCCR4A |= (0<<COM4C1) | (0<<COM4C0); // MC_IN1 left backwards connected to OC4C
+	
 }
 
 void vMotorMoveLeftForward(uint8_t actuation, uint8_t *leftWheelDirection){
