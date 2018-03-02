@@ -143,13 +143,13 @@ void vMainCommunicationTask( void *pvParameters ){
 		vLED_singleHigh(ledRED);
 	}
 	uint8_t success = 0;
-	
+	vLED_singleHigh(ledYELLOW);
 	while(!success) {
 		success = server_connect();
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 		vLED_toggle(ledGREEN);
 	}
-	
+	vLED_singleLow(ledYELLOW);
 	send_handshake();
 	
 	while(1){
@@ -596,7 +596,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float predictedY = 0.0;
     
     float gyroOffset = 0.0;
-    float compassOffset = 0.0;
+    //float compassOffset = 0.0;
     
     // Found by using calibration task
     //int16_t xComOff = 11;																					KOMMENTERT UT FOR Å IKKE BRUKE KOMPASS
@@ -1059,7 +1059,7 @@ int main(void){
     xTaskCreate(vMainMovementTask, "Movement", 300, NULL, 4, NULL); // Independent task, uses ticks from ISR
     xTaskCreate(vMainCommunicationTask, "Comm", 300, NULL, 3, NULL); // Dependant on ISR from UART, sends instructions to other tasks
     
-  /*  #ifndef COMPASS_CALIBRATE // If compass calibration task is running dont use these tasks
+    #ifndef COMPASS_CALIBRATE // If compass calibration task is running dont use these tasks
         xTaskCreate(vMainPoseControllerTask, "PoseCon", 300, NULL, 2, NULL); // Dependant on estimator, sends instructions to movement task
         xTaskCreate(vMainPoseEstimatorTask, "PoseEst", 300, NULL, 5, NULL); // Independent task, uses ticks from ISR
         xTaskCreate(vMainSensorTowerTask,"Tower",300, NULL, 1, NULL); // Independent task, but use pose updates from estimator
@@ -1071,7 +1071,7 @@ int main(void){
         debug("Connect to begin!\n");
         xTaskCreate(compassTask, "compasscal", 3500, NULL, 3, NULL); // Task used for compass calibration, dependant on communication and movement task
     #endif
-    */
+    
     
 
     sei();
