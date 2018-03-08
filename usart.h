@@ -6,14 +6,15 @@
 
 #ifndef USART_H_
 #define USART_H_
-
 /************************************************************************/
 //Initialize USART driver, note that RXD0/TXD0 (PD0/PD1) is used
 // Note that the nRF51 dongle is limited to send 20 characters
 // in each package
 /************************************************************************/
-void vUSART_init();
 
+void vUSART_init();
+void USART_send_test( unsigned char data);
+void USART_putstring_test(char* StringPtr);
 void vUSART_send(uint8_t *data, uint16_t len);
 void vUSART_set_receive_callback(void(*cb)(uint8_t*, uint16_t));
 
