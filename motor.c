@@ -123,7 +123,8 @@ void vMotorMoveRightBackward(uint8_t actuation, uint8_t *rightWheelDirection){
 }
 
 void vMotorBrakeLeft(){
-    motorLeftPWM = 255;
+	motorLeftPWM = 0;
+    //motorLeftPWM = 255;											MIDLERTIDIG ENDRING: MÅ KANSKJE FIKSE DENNE IGJEN NÅR ROBOTEN FUNGERER. NÅ BREMSER DEN IKKE
     //PORTE |= (1<<motorLeftOn);
     PORTB &= ~(1<<motorLeftForward);
     PORTB &= ~(1<<motorLeftBackward);
@@ -132,13 +133,14 @@ void vMotorBrakeLeft(){
 
 void vMotorGlideLeft(){
     motorLeftPWM = 0;
-    //PORTE &= ~(1<<motorLeftOn);
+    //PORTE &= ~(1<<motorLeftOn);									
     PORTB &= ~(1<<motorLeftForward);
     PORTB &= ~(1<<motorLeftBackward);
 }
 
 void vMotorBrakeRight(){
-    motorRightPWM = 255;
+	motorRightPWM = 0;
+    //motorRightPWM = 255;											MIDLERTIDIG ENDRING:MÅ KANSKJE FIKSE DENNE IGJEN NÅR ROBOTEN FUNGERER. NÅ BREMSER DEN IKKE
     //PORTH |= (1<<motorRightOn);
     PORTH &= ~(1<<motorRightForward);
     PORTH &= ~(1<<motorRightBackward);
