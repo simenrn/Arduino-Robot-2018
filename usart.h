@@ -13,8 +13,6 @@
 /************************************************************************/
 
 void vUSART_init();
-void USART_send_test( unsigned char data);
-void USART_putstring_test(char* StringPtr);
 void vUSART_send(uint8_t *data, uint16_t len);
 void vUSART_set_receive_callback(void(*cb)(uint8_t*, uint16_t));
 

@@ -6,8 +6,6 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <string.h>
-#include <stdio.h>
 #include "usart.h"
 #include "LED.h"
 /* Baud rate set in defines */
@@ -70,23 +68,6 @@ void vUSART_init(){
 	xUartMutex = xSemaphoreCreateMutex();
 }
 
-void USART_send_test( unsigned char data){
-	
-	while(!(UCSR0A & (1<<UDRE0)));
-	UDR0 = data;
-	
-}
-
-void USART_putstring_test(char* StringPtr){
-	
-	while(*StringPtr != 0x00){
-		USART_send_test(*StringPtr);
-	StringPtr++;}
-	
-}
-
-
-
 void vUSART_send(uint8_t *data, uint16_t len) {
 	xSemaphoreTake(xUartMutex, portMAX_DELAY);
 	buffer_append(&send_buffer, data, len);
@@ -123,7 +104,6 @@ void vUartSendTask(void *pvParamters) {
 		vTaskDelay(10*portTICK_PERIOD_MS);
 	}
 }
-
 
 ISR(USART2_RX_vect){
 	static uint8_t input_buffer[100];
