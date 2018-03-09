@@ -152,11 +152,7 @@ void vMainCommunicationTask( void *pvParameters ){
 	
 	send_handshake();
 	
-	while(1){
-		
-		char in_comm_task[] = "In communication task! ";
-		USART_putstring_test(in_comm_task);
-		
+	while(1){	
 		if (xSemaphoreTake(xCommandReadyBSem, portMAX_DELAY) == pdTRUE){
 			// We have a new command from the server, copy it to the memory
 			vTaskSuspendAll ();       // Temporarily disable context switching
@@ -169,21 +165,18 @@ void vMainCommunicationTask( void *pvParameters ){
 					taskENTER_CRITICAL();
 					gHandshook = TRUE; // Set start flag true
 					taskEXIT_CRITICAL();
-					//char print_handshake[] = "Handshake ";
-					//USART_putstring_test(print_handshake);
 					break;
 				case TYPE_PING:
 					send_ping_response();
-					//char print_ping[] = "Ping sent ";
-					//USART_putstring_test(print_ping);
 					break;
 				case TYPE_ORDER:
 					vLED_singleHigh(ledRED);
 					Setpoint.x = command_in.message.order.x*10;
-					Setpoint.y = command_in.message.order.y*10;
+					Setpoint.y = command_in.message.order.y;
+					
+					debug("Setpoint x: %f\n",Setpoint.x);
+					debug("Setpoint y: %f\n",Setpoint.y);
 					/*
-					char print_order[] = "Order ";
-					USART_putstring_test(print_order);
 					
 					
 					Setpoint.heading = command_in.message.order.orientation;
@@ -238,7 +231,7 @@ void vMainCommunicationTask( void *pvParameters ){
 void vMainSensorTowerTask( void *pvParameters){
     /* Task init */
     #ifdef DEBUG
-        printf("Tower OK\n");
+        debug("Tower OK\n");
     #endif 
         
     float thetahat = 0;
@@ -258,8 +251,6 @@ void vMainSensorTowerTask( void *pvParameters){
     
     while(1){
         // Loop
-		char in_sensor_task[] = "sensor task! ";
-		USART_putstring_test(in_sensor_task);
         if ((gHandshook == TRUE) && (gPaused == FALSE)){
             // xLastWakeTime variable with the current time.
             xLastWakeTime = xTaskGetTickCount();
@@ -297,6 +288,11 @@ void vMainSensorTowerTask( void *pvParameters){
             uint8_t leftSensor = ui8DistSens_readCM(distSensLeft);
             uint8_t rearSensor = ui8DistSens_readCM(distSensRear);
             uint8_t rightSensor = ui8DistSens_readCM(distSensRight);
+			
+			//debug("forwardSensor: %i", forwardSensor);
+			//debug("leftSensor: %i", leftSensor);
+			//debug("rearSensor: %i", rearSensor);
+			//debug("rightSensor: %i", rightSensor);
             
             xSemaphoreTake(xPoseMutex,40 / portTICK_PERIOD_MS);
                 thetahat = gTheta_hat;
@@ -366,7 +362,7 @@ void vMainSensorTowerTask( void *pvParameters){
 /*  Calculates new settings for the movement task */
 void vMainPoseControllerTask( void *pvParameters ){
     #ifdef DEBUG
-        printf("PoseController OK\n");
+        debug("PoseController OK\n");
         uint8_t tellar = 0;
     #endif
 	
@@ -560,7 +556,10 @@ void vMainPoseControllerTask( void *pvParameters ){
 						rightIntError = 0;
 						
 					}
-					
+					debug("Left speed: %i",LSpeed);
+					debug("Right speed: %i", RSpeed);
+					debug("Left wheel direction: %i", gLeftWheelDirection);
+					debug("Right wheel direction: %i", gRightWheelDirection);
 					vMotorMovementSwitch(LSpeed,RSpeed, &gLeftWheelDirection, &gRightWheelDirection);
 			
 				}else{
@@ -569,6 +568,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 						send_idle();
 						idleSendt = TRUE;
 					}
+					
 					vMotorBrakeLeft();
 					vMotorBrakeRight();
 					lastMovement = moveStop;
@@ -624,9 +624,9 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     
     
     #ifdef DEBUG
-        printf("Estimator OK");
-        printf("[%i]",PERIOD_ESTIMATOR_MS);
-        printf("ms\n");   
+        debug("Estimator OK");
+        debug("[%i]",PERIOD_ESTIMATOR_MS);
+        debug("ms\n");   
         uint8_t printerTellar = 0;     
     #endif
     
@@ -792,7 +792,7 @@ void vMainMovementTask( void *pvParameters ){
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     #ifdef DEBUG
-    printf("Movement OK\n");
+    debug("Movement OK\n");
     #endif
     
     
@@ -814,7 +814,7 @@ void vMainMovementTask( void *pvParameters ){
 #ifdef COMPASS_CALIBRATE
 void compassTask(void *par){
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    printf("Compass running\n");
+    debug("Compass running\n");
     int16_t xComOff = 0;
     int16_t yComOff = 0;
     while(1){
@@ -829,11 +829,11 @@ void compassTask(void *par){
 //             
 //             vTaskDelay(15/portTICK_PERIOD_MS);
 //         }
-        printf("Rotating in\n...3\n");
+        debug("Rotating in\n...3\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        printf("...2\n");
+        debug("...2\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        printf("...1\n");
+        debug("...1\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         uint8_t movement;
         movement = moveCounterClockwise;
@@ -994,15 +994,14 @@ int main(void){
 	// vCOM_init();
     
 	
+
 	
 	/* ************************************* TESTING **************************************/
-
-	/*
-	char test[]="Din satans pikk "; 
-	while(1){        //Infinite loop
-		USART_putstring_test(test);    //Pass the string to the USART_putstring function and sends it over the serial
-		_delay_ms(5000);        //Delay for 5 seconds so it will re-send the string every 5 seconds
-	}*/
+	
+	
+		
+	
+	
 	
 	
 	/* ************************************* TESTING **************************************/
@@ -1038,7 +1037,7 @@ int main(void){
         xTaskCreate(compassTask, "compasscal", 3500, NULL, 3, NULL); // Task used for compass calibration, dependant on communication and movement task
     #endif
     
-    
+   
 
     sei();
     //vLED_singleLow(ledRED);
@@ -1047,6 +1046,14 @@ int main(void){
     #endif
     //  Start scheduler 
     vTaskStartScheduler();
+	
+	
+	
+		
+
+
+	
+	
 
     //  MCU is out of RAM if the program comes here 
     while(1){
