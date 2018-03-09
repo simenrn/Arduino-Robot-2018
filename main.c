@@ -994,7 +994,7 @@ int main(void){
             debug("Compass init..\n");
     #endif
     
-    vCOM_init();
+    //vCOM_init();
     
     /* Initialize RTOS utilities  */
     movementQ = xQueueCreate(2,sizeof(uint8_t)); // For sending movements to vMainMovementTask
