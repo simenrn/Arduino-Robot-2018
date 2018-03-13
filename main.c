@@ -160,6 +160,10 @@ void vMainCommunicationTask( void *pvParameters ){
 			command_in = message_in;
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
+			//debug("Message received: \n");
+			//debug("Type: %i", command_in.type);
+			//debug("Order x: %i", command_in.message.order.x);
+			//debug("Order y: %i", command_in.message.order.y);
 			switch(command_in.type){
 				case TYPE_CONFIRM:
 					taskENTER_CRITICAL();
@@ -174,8 +178,8 @@ void vMainCommunicationTask( void *pvParameters ){
 					Setpoint.x = command_in.message.order.x*10;
 					Setpoint.y = command_in.message.order.y;
 					
-					debug("Setpoint x: %f\n",Setpoint.x);
-					debug("Setpoint y: %f\n",Setpoint.y);
+					//debug("Setpoint x: %f\n",Setpoint.x);
+					//debug("Setpoint y: %f\n",Setpoint.y);
 					/*
 					
 					
@@ -556,10 +560,11 @@ void vMainPoseControllerTask( void *pvParameters ){
 						rightIntError = 0;
 						
 					}
-					debug("Left speed: %i",LSpeed);
+					/*debug("Left speed: %i",LSpeed);
 					debug("Right speed: %i", RSpeed);
 					debug("Left wheel direction: %i", gLeftWheelDirection);
 					debug("Right wheel direction: %i", gRightWheelDirection);
+					*/
 					vMotorMovementSwitch(LSpeed,RSpeed, &gLeftWheelDirection, &gRightWheelDirection);
 			
 				}else{
@@ -997,7 +1002,11 @@ int main(void){
 
 	
 	/* ************************************* TESTING **************************************/
-	
+	while (1)
+	{
+		vServo_setAngle(0);
+		_delay_ms(5000);
+	}
 	
 		
 	
@@ -1036,8 +1045,6 @@ int main(void){
         debug("Connect to begin!\n");
         xTaskCreate(compassTask, "compasscal", 3500, NULL, 3, NULL); // Task used for compass calibration, dependant on communication and movement task
     #endif
-    
-   
 
     sei();
     //vLED_singleLow(ledRED);
@@ -1046,14 +1053,6 @@ int main(void){
     #endif
     //  Start scheduler 
     vTaskStartScheduler();
-	
-	
-	
-		
-
-
-	
-	
 
     //  MCU is out of RAM if the program comes here 
     while(1){

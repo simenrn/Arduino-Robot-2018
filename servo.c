@@ -70,6 +70,7 @@ void vServo_init(uint8_t servoAngleDeg){
 
 /* Sets servo angle to a specific degree */
 void vServo_setAngle(uint8_t ServoAngleDeg){
+	debug("vServo_setAngle: %i", ServoAngleDeg);
     /* Ensure feasible values */
     if (ServoAngleDeg >= 90){
         ServoAngleDeg = 90;
