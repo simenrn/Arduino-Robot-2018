@@ -160,6 +160,9 @@ void vMainCommunicationTask( void *pvParameters ){
 			command_in = message_in;
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
+			debug("Message received: \n");
+			debug("Orientation: %i", command_in.message.order.orientation);
+			debug("Distance: %i", command_in.message.order.distance);
 			switch(command_in.type){
 				case TYPE_CONFIRM:
 					taskENTER_CRITICAL();
