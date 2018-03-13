@@ -9,7 +9,8 @@
 
 /*  Custom includes    */
 #include "servo.h"
-#include "defines.h"    
+#include "defines.h"
+#include "server_communication.h"   
     
 /************************************************************************/
 //     Values found by testing:
@@ -70,14 +71,24 @@ void vServo_init(uint8_t servoAngleDeg){
 
 /* Sets servo angle to a specific degree */
 void vServo_setAngle(uint8_t ServoAngleDeg){
-	debug("vServo_setAngle: %i", ServoAngleDeg);
+	//debug("vServo_setAngle: %i", ServoAngleDeg);
     /* Ensure feasible values */
     if (ServoAngleDeg >= 90){
         ServoAngleDeg = 90;
+		/* Fetch pulse width from array and set to output */
+		servoOCR = DEG_TO_PWM[ServoAngleDeg];
     }
     else if(ServoAngleDeg <= 0){
         ServoAngleDeg = 0;
+		/* Fetch pulse width from array and set to output */
+		servoOCR = DEG_TO_PWM[ServoAngleDeg];
     }
-    /* Fetch pulse width from array and set to output */
-    servoOCR = DEG_TO_PWM[ServoAngleDeg];
+	else if (ServoAngleDeg>0 && ServoAngleDeg<90)
+	{
+		/* Fetch pulse width from array and set to output */
+		servoOCR = DEG_TO_PWM[ServoAngleDeg];
+	}
+	else{
+		//debug("Input error vServo_setAngle in servo.c ");
+	}
 }

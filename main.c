@@ -152,7 +152,8 @@ void vMainCommunicationTask( void *pvParameters ){
 	
 	send_handshake();
 	
-	while(1){	
+	while(1){
+		vLED_toggle(ledGREEN);
 		if (xSemaphoreTake(xCommandReadyBSem, portMAX_DELAY) == pdTRUE){
 			// We have a new command from the server, copy it to the memory
 			vTaskSuspendAll ();       // Temporarily disable context switching
@@ -160,8 +161,8 @@ void vMainCommunicationTask( void *pvParameters ){
 			command_in = message_in;
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
-			//debug("Message received: \n");
-			//debug("Type: %i", command_in.type);
+			debug("Message received: \n");
+			debug("Type: %i", command_in.type);
 			//debug("Order x: %i", command_in.message.order.x);
 			//debug("Order y: %i", command_in.message.order.y);
 			switch(command_in.type){
@@ -174,7 +175,6 @@ void vMainCommunicationTask( void *pvParameters ){
 					send_ping_response();
 					break;
 				case TYPE_ORDER:
-					vLED_singleHigh(ledRED);
 					Setpoint.x = command_in.message.order.x*10;
 					Setpoint.y = command_in.message.order.y;
 					
@@ -202,6 +202,7 @@ void vMainCommunicationTask( void *pvParameters ){
 					break;
 				case TYPE_PAUSE:
 					// Stop sending update messages
+					debug("Received pause from server");
 					taskENTER_CRITICAL();
 					gPaused = TRUE;
 					taskEXIT_CRITICAL();
@@ -285,7 +286,11 @@ void vMainSensorTowerTask( void *pvParameters){
 						break;
                 }
             }
-            vServo_setAngle(servoStep*servoResolution);
+			if ((servoStep*servoResolution)>90 || (servoStep*servoResolution)<0){
+				//debug("servostep*servoresultion error: %i\t%i", servoStep, servoResolution);
+			} else{
+				vServo_setAngle(servoStep*servoResolution);
+			}
             vTaskDelayUntil(&xLastWakeTime, 200 / portTICK_PERIOD_MS); // Wait total of 200 ms for servo to reach set point					ENDRET FRA 200 TIL 100 FOR TEST!!!!
             
             uint8_t forwardSensor = ui8DistSens_readCM(distSensFwd);
@@ -987,10 +992,10 @@ int main(void){
     #ifdef DEBUG
         debug("IMU init..\n");
     #endif
-	vLED_singleHigh(ledGREEN);
+	//vLED_singleHigh(ledGREEN);
     sIMU_begin(); 
-   vLED_singleLow(ledGREEN);
-   vLED_singleLow(ledRED);
+   //vLED_singleLow(ledGREEN);
+	vLED_singleLow(ledRED);
     /* Initialize compass */
     /* Connected with I2C, if the chip has no power, MCU will lock. */
     #ifdef DEBUG
@@ -1002,11 +1007,11 @@ int main(void){
 
 	
 	/* ************************************* TESTING **************************************/
-	while (1)
+	/*while (1)
 	{
 		vServo_setAngle(0);
 		_delay_ms(5000);
-	}
+	}*/
 	
 		
 	
@@ -1047,7 +1052,6 @@ int main(void){
     #endif
 
     sei();
-    //vLED_singleLow(ledRED);
     #ifdef DEBUG
     debug("Starting scheduler ....\n");
     #endif
@@ -1095,9 +1099,10 @@ ISR(nRF51_status){
     else{
         // We are not connected or lost connection, reset handshake flag
         gHandshook = FALSE;
+		
         gPaused = FALSE;
         vLED_singleLow(ledGREEN);
-        vLED_singleLow(ledYELLOW);
+        vLED_singleHigh(ledYELLOW);
         vLED_singleLow(ledRED);
         xSemaphoreGiveFromISR(xCommandReadyBSem,0); // Let uart parser reset if needed
     }
