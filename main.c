@@ -25,15 +25,15 @@
 // See line 84
 //
 // HARDWARE SETUP
-//  Servo pin:  Port B pin 5
+//  Servo pin:  Port H pin 4
 //  Sensor pins: Port F pin 0 - 4
-//  Motor pins: Port C, pin 5 & 7 and Port H pin 3. Port A pin 2 & 4 and Port E pin 3.
+//  Motor pins: Port B, pin 4 & 5 & 6 & 7 and Port H pin 5 & 6.
 //  Encoder pins: Port D pin 2 & 3
 //
 // TIMERS USED:
-//  Timer0  motorRightPWM   (OCR0B)
+//  Timer0  motorRightPWM   (OCR1B)
 //  Timer0  motorLeftPWM    (OCR0A)
-//  Timer1  ServoPWM        (OCR1A)
+//  Timer1  ServoPWM        (OCR4B)
 //  Timer3 FreeRTOS time slicer
 //
 // Interrupt routines located after main function
@@ -53,6 +53,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
+#include <util/delay.h>
 
 /* Semaphore handles */
 SemaphoreHandle_t xScanLock;
@@ -106,17 +107,12 @@ volatile int16_t gRightWheelTicks = 0;
 volatile int16_t gLeftWheelTicks = 0;
 
 /* STRUCTURE */
-struct sPolar{
-    float heading;
-    int16_t distance;
-};
-
-struct sCartesian{
+struct sPoint{
 	float x;
 	float y;
 };
 
-/*#define DEBUG*/
+//#define DEBUG
 
 #ifdef DEBUG
 #warning DEBUG IS ACTIVE
@@ -124,17 +120,21 @@ struct sCartesian{
 
 /*#define tictoc*/
 #ifdef tictoc
-    // Pin for timing tasks, use tic/toc - PINH5 (Arduino 8) is available
-    #define usetictoc DDRH |= (1<<PINH5)
-    #define tic PORTH |= (1<<PINH5)
-    #define toc PORTH &= ~(1<<PINH5)
+    // Pin for timing tasks, use tic/toc - PING5 (Arduino 4) is available
+    #define usetictoc DDRG |= (1<<PING5)
+    #define tic PORTG |= (1<<PING5)
+    #define toc PORTG &= ~(1<<PING5)
 #endif
+
+/* Variable for printing to terminal 
+char printToTerminal[0] = " ";
+*/
 
 /*  Communication task */
 /*  Communication task */
 void vMainCommunicationTask( void *pvParameters ){
 	// Setup for the communication task
-	struct sPolar Setpoint = {0}; // Struct for setpoints from server
+	struct sPoint Setpoint = {0}; // Struct for setpoints from server
 
 	message_t command_in; // Buffer for recieved messages
 
@@ -153,6 +153,7 @@ void vMainCommunicationTask( void *pvParameters ){
 	send_handshake();
 	
 	while(1){
+		vLED_toggle(ledGREEN);
 		if (xSemaphoreTake(xCommandReadyBSem, portMAX_DELAY) == pdTRUE){
 			// We have a new command from the server, copy it to the memory
 			vTaskSuspendAll ();       // Temporarily disable context switching
@@ -160,17 +161,28 @@ void vMainCommunicationTask( void *pvParameters ){
 			command_in = message_in;
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
+			debug("Message received: \n");
+			debug("Type: %i", command_in.type);
+			//debug("Order x: %i", command_in.message.order.x);
+			//debug("Order y: %i", command_in.message.order.y);
 			switch(command_in.type){
 				case TYPE_CONFIRM:
 					taskENTER_CRITICAL();
 					gHandshook = TRUE; // Set start flag true
 					taskEXIT_CRITICAL();
-
 					break;
-					case TYPE_PING:
+				case TYPE_PING:
 					send_ping_response();
 					break;
 				case TYPE_ORDER:
+					Setpoint.x = command_in.message.order.x*10;
+					Setpoint.y = command_in.message.order.y;
+					
+					//debug("Setpoint x: %f\n",Setpoint.x);
+					//debug("Setpoint y: %f\n",Setpoint.y);
+					/*
+					
+					
 					Setpoint.heading = command_in.message.order.orientation;
 					Setpoint.distance = command_in.message.order.distance;
 					// Ensure max values are not exceeded
@@ -182,18 +194,25 @@ void vMainCommunicationTask( void *pvParameters ){
 					}
 					Setpoint.heading *= DEG2RAD; // Convert received set point to radians
 					vFunc_Inf2pi(&Setpoint.heading);
+					*/
+					
 				
 					/* Relay new coordinates to position controller */
 					xQueueSend(poseControllerQ, &Setpoint, 100);
 					break;
 				case TYPE_PAUSE:
 					// Stop sending update messages
+					debug("Received pause from server");
 					taskENTER_CRITICAL();
 					gPaused = TRUE;
 					taskEXIT_CRITICAL();
 					// Stop controller
+					Setpoint.x = 0;
+					Setpoint.y = 0;
+					/*
 					Setpoint.distance = 0;
 					Setpoint.heading = 0;
+					*/
 					xQueueSend(poseControllerQ, &Setpoint, 100);
 					break;
 				case TYPE_UNPAUSE:
@@ -208,7 +227,8 @@ void vMainCommunicationTask( void *pvParameters ){
 					break;
 			}
 			// Command is processed
-		} // if (xCommandReady) end
+		}
+		vLED_singleLow(ledRED); // if (xCommandReady) end
 	}// While(1) end
 }// vMainComtask end
 
@@ -216,7 +236,7 @@ void vMainCommunicationTask( void *pvParameters ){
 void vMainSensorTowerTask( void *pvParameters){
     /* Task init */
     #ifdef DEBUG
-        printf("Tower OK\n");
+        debug("Tower OK\n");
     #endif 
         
     float thetahat = 0;
@@ -249,30 +269,39 @@ void vMainSensorTowerTask( void *pvParameters){
                         servoStep *= servoResolution;
                         servoResolution = 1;
                         idleCounter = 1;
-                    break;
+						break;
                     case moveForward:
                     case moveBackward:
                         servoResolution = 5;
                         servoStep /= servoResolution;
                         idleCounter = 0;
-                    break;
+						break;
                     case moveClockwise:
                     case moveCounterClockwise:
                         // Iterations are frozen while rotating, see further down
                         idleCounter = 0;
-                    break;
+						break;
                     default:
                         idleCounter = 0;
-                    break;
+						break;
                 }
             }
-            vServo_setAngle(servoStep*servoResolution);
-            vTaskDelayUntil(&xLastWakeTime, 200 / portTICK_PERIOD_MS); // Wait total of 200 ms for servo to reach set point
+			if ((servoStep*servoResolution)>90 || (servoStep*servoResolution)<0){
+				//debug("servostep*servoresultion error: %i\t%i", servoStep, servoResolution);
+			} else{
+				vServo_setAngle(servoStep*servoResolution);
+			}
+            vTaskDelayUntil(&xLastWakeTime, 200 / portTICK_PERIOD_MS); // Wait total of 200 ms for servo to reach set point					ENDRET FRA 200 TIL 100 FOR TEST!!!!
             
             uint8_t forwardSensor = ui8DistSens_readCM(distSensFwd);
             uint8_t leftSensor = ui8DistSens_readCM(distSensLeft);
             uint8_t rearSensor = ui8DistSens_readCM(distSensRear);
             uint8_t rightSensor = ui8DistSens_readCM(distSensRight);
+			
+			//debug("forwardSensor: %i", forwardSensor);
+			//debug("leftSensor: %i", leftSensor);
+			//debug("rearSensor: %i", rearSensor);
+			//debug("rightSensor: %i", rightSensor);
             
             xSemaphoreTake(xPoseMutex,40 / portTICK_PERIOD_MS);
                 thetahat = gTheta_hat;
@@ -306,9 +335,9 @@ void vMainSensorTowerTask( void *pvParameters){
 			
             if ((objectX > 0) && (objectX < 20)){
                 // Stop controller
-                struct sPolar Setpoint = {0, 0};
+                struct sPoint Setpoint = {0, 0};
                 xQueueSend(poseControllerQ, &Setpoint, 100);
-				
+				send_idle();
 				
             }
             
@@ -342,19 +371,20 @@ void vMainSensorTowerTask( void *pvParameters){
 /*  Calculates new settings for the movement task */
 void vMainPoseControllerTask( void *pvParameters ){
     #ifdef DEBUG
-        printf("PoseController OK\n");
+        debug("PoseController OK\n");
         uint8_t tellar = 0;
     #endif
+	
     /* Task init */    
-    struct sPolar Setpoint = {0}; // Updates from server
-    struct sCartesian Error = {0}; // Error values
-    struct sPolar oldVal = {0};
-    struct sPolar referenceModel = {0};
-	float radiusEpsilon = 15; //[mm]The acceptable radius from goal for completion
+    struct sPoint Setpoint = {0}; // Updates from server
+    //struct sCartesian Error = {0}; // Error values
+    struct sPoint oldVal = {0};
+    struct sPoint referenceModel = {0};
+	float radiusEpsilon = 5; //[mm]The acceptable radius from goal for completion
 	uint8_t lastMovement = 0;
 	
-	uint8_t maxRotateActuation = 75; //The max speed the motors will run at during rotation max is 255
-	uint8_t maxDriveActuation = 100; //The max speed the motors will run at during drive max is 255
+	uint8_t maxRotateActuation = 40; //The max speed the motors will run at during rotation max is 255
+	uint8_t maxDriveActuation = 75; //The max speed the motors will run at during drive max is 255
 	uint8_t currentDriveActuation = maxRotateActuation;
 	
 	/* Controller variables for tuning */
@@ -362,7 +392,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 	float driveThreshold = 0.0174; // [rad ]The threshold at which the robot will go from rotation to driving. In degrees.
 	float driveKp = 600; //Proportional gain for theta control during drive
 	float driveKi = 10;//Integral gain for theta during drive
-	float speedDecreaseThreshold = 500; //[mm] Distance from goal where the robot will decrease its speed inverse proportionally
+	float speedDecreaseThreshold = 300; //[mm] Distance from goal where the robot will decrease its speed inverse proportionally
 	
 	/* Current position variables */	
 	float thetahat = 0;
@@ -393,12 +423,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 	uint8_t gRightWheelDirection = 0;
 	
 	uint8_t idleSendt = FALSE;
-	
-	
-	
-	
-	
-      
+	     
 	while(1){
 		// Checking if server is ready
 		if (gHandshook){
@@ -440,15 +465,11 @@ void vMainPoseControllerTask( void *pvParameters ){
 				// Check if a new update is received
 				if (xQueueReceive(poseControllerQ, &Setpoint, 0) == pdTRUE){
 					xQueueReceive(poseControllerQ, &Setpoint, 20 / portTICK_PERIOD_MS); // Receive theta and radius set points from com task, wait for 20ms if necessary
-					Setpoint.distance = Setpoint.distance*10; //Distance is received in cm, convert to mm for continuity
-					
-					
-					
-					xTargt = xhat + Setpoint.distance*cos(Setpoint.heading + thetahat);
-					yTargt = yhat + Setpoint.distance*sin(Setpoint.heading + thetahat);
-					
-					
-				
+					xTargt = Setpoint.x;
+					yTargt = Setpoint.y;
+				} else {
+					xTargt = xhat;
+					yTargt = yhat;
 				}
 				
 				distance = (float)sqrt((xTargt-xhat)*(xTargt-xhat) + (yTargt-yhat)*(yTargt-yhat));
@@ -507,12 +528,10 @@ void vMainPoseControllerTask( void *pvParameters ){
 							//Saturation
 							if (RSpeed > currentDriveActuation){
 								RSpeed = currentDriveActuation;
-								}else if(RSpeed < 0){
+							}else if(RSpeed < 0){
 								RSpeed = 0;
 							}
-							
 							LSpeed = currentDriveActuation;
-							
 							
 							
 						}
@@ -546,12 +565,11 @@ void vMainPoseControllerTask( void *pvParameters ){
 						rightIntError = 0;
 						
 					}
-					
-					
-					
-					
-					
-					
+					/*debug("Left speed: %i",LSpeed);
+					debug("Right speed: %i", RSpeed);
+					debug("Left wheel direction: %i", gLeftWheelDirection);
+					debug("Right wheel direction: %i", gRightWheelDirection);
+					*/
 					vMotorMovementSwitch(LSpeed,RSpeed, &gLeftWheelDirection, &gRightWheelDirection);
 			
 				}else{
@@ -561,25 +579,18 @@ void vMainPoseControllerTask( void *pvParameters ){
 						idleSendt = TRUE;
 					}
 					
-					
 					vMotorBrakeLeft();
 					vMotorBrakeRight();
 					lastMovement = moveStop;
 				}
 				
-				
-				
 				xQueueSend(scanStatusQ, &lastMovement, 0); // Send the current movement to the scan task
 				
-			} // No semaphore available, task is blocking
-			
+			}// No semaphore available, task is blocking
 		} //if(gHandshook) end
-	}
-	
-	
-	  
-	
+	} 
 }
+
 
 /* Pose estimator task */
 void vMainPoseEstimatorTask( void *pvParameters ){
@@ -599,7 +610,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float compassOffset = 0.0;
     
     // Found by using calibration task
-    int16_t xComOff = 11; 
+    int16_t xComOff = 11;
     int16_t yComOff = -78;
     
     float variance_gyro = 0.0482f; // [rad] calculated offline, see report
@@ -608,17 +619,24 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float variance_gyro_encoder = (variance_gyro + variance_encoder) * period_in_S; // (Var gyro + var encoder) * timestep
     float covariance_filter_predicted = 0;
     
-    #define CONST_VARIANCE_COMPASS 0.3490f
-    
+   #ifdef COMPASS_ENABLED
+   #define CONST_VARIANCE_COMPASS 0.0349f // 2 degrees in rads, as specified in the data sheet
+   #define COMPASS_FACTOR 10000.0f// We are driving inside with a lot of interference, compass needs to converge slowly
+   #endif
+
+   #ifndef COMPASS_ENABLED
+   #define CONST_VARIANCE_COMPASS 0.0f
+   #define COMPASS_FACTOR 0.0f
+   #endif
 
     float gyroWeight = 0.5;//encoderError / (encoderError + gyroError);
     uint8_t robot_is_turning = 0;
     
     
     #ifdef DEBUG
-        printf("Estimator OK");
-        printf("[%i]",PERIOD_ESTIMATOR_MS);
-        printf("ms\n");   
+        debug("Estimator OK");
+        debug("[%i]",PERIOD_ESTIMATOR_MS);
+        debug("ms\n");   
         uint8_t printerTellar = 0;     
     #endif
     
@@ -643,20 +661,12 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             float dRight =(float)(rightWheelTicks - previous_ticksRight) * WHEEL_FACTOR_MM; // Distance right wheel has traveled since last sample
             previous_ticksLeft = leftWheelTicks;
             previous_ticksRight = rightWheelTicks;
-            
-			
-			
-					   
+            				   
 					   
             float dRobot = (dLeft + dRight) / 2;           
             float dTheta = (dRight - dLeft) / WHEELBASE_MM; // Get angle from encoders, dervied from arch of circles formula
             
-			
-			
-			
-			
-			
-            
+  
             /* PREDICT */
             // Get gyro data:
             float gyrZ = (fIMU_readFloatGyroZ() - gyroOffset);
@@ -669,13 +679,12 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 }
             else {
                 robot_is_turning = TRUE;
-                gyroWeight = 0.85; // Found by experiment, after 20x90 degree turns, gyro seems 85% more accurate than encoders
+                gyroWeight = 0.75; // Found by experiment, after 20x90 degree turns, gyro seems 85% more accurate than encoders  UPDATE: ENDRET I GEIRS KODE TIL 0.75
                 
             }
             
             gyrZ *= period_in_S * DEG2RAD; // Scale gyro measurement      
-            
-			
+           		
 			
             // Fuse heading from sensors to predict heading:
             dTheta =  (1 - gyroWeight) * dTheta + gyroWeight * gyrZ;
@@ -692,7 +701,8 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             // Predicted (a priori) estimate covariance
             covariance_filter_predicted += variance_gyro_encoder;
             
-            /* UPDATE */
+            //UPDATE
+			#ifdef COMPASS_ENABLED 
             // Get compass data: ( Request and recheck after 6 ms?)
             int16_t xCom, yCom, zCom;
             vCOM_getData(&xCom, &yCom, &zCom);
@@ -705,25 +715,28 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             // Update predicted state:    
             float error = (compassHeading - predictedTheta);
             vFunc_Inf2pi(&error);
-            
-            
-            //kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
+			#endif
+			#ifndef COMPASS_ENABLED
+			float error = 0.0;
+			#endif
+			
+            kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
             ///* Commented back in due to fixed encoder
             if (fabs(error) > (0.8727*period_in_S)){ // 0.8727 rad/s is top speed while turning
-                // If we have a reading over this, we can safely ignore the compass
-                // Ignore compass while driving in a straight line
-                kalmanGain = 0;
-                vLED_singleLow(ledYELLOW);
+	            // If we have a reading over this, we can safely ignore the compass
+	            // Ignore compass while driving in a straight line
+	            kalmanGain = 0;
+	            vLED_singleLow(ledYELLOW);
             }
             else if ((robot_is_turning == FALSE) && (dRobot == 0)){
-                // Updated (a posteriori) state estimate
-                kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
-                vLED_singleHigh(ledYELLOW);
+	            // Updated (a posteriori) state estimate
+	            kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
+	            vLED_singleHigh(ledYELLOW);
             }
             else{
-                kalmanGain = 0;
-                vLED_singleLow(ledYELLOW);
-            }            
+	            kalmanGain = 0;
+	            vLED_singleLow(ledYELLOW);
+            }         
             //*/
            
             predictedTheta  += kalmanGain*(error);
@@ -750,21 +763,14 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             float gyro = 0;
             for (i = 0; i<=samples; i++){
                 gyro+= fIMU_readFloatGyroZ();
-            }
-            
-            int16_t xCom, yCom, zCom;
-            vCOM_getData(&xCom, &yCom, &zCom);
-            xCom += xComOff;
-            yCom += yComOff;
+			}
             
             
             // Initialize pose to 0 and reset offset variables
             predictedX = 0;
             predictedY = 0;
             predictedTheta = 0;
-            
-            compassOffset = atan2(yCom, xCom);    
-            gyroOffset = gyro / (float)i;               
+            gyroOffset = gyro / (float)i;       
         }
     } // While(1) end
 }
@@ -796,7 +802,7 @@ void vMainMovementTask( void *pvParameters ){
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     #ifdef DEBUG
-    printf("Movement OK\n");
+    debug("Movement OK\n");
     #endif
     
     
@@ -814,11 +820,11 @@ void vMainMovementTask( void *pvParameters ){
 
 
 //#define COMPASS_CALIBRATE
-
+/*
 #ifdef COMPASS_CALIBRATE
 void compassTask(void *par){
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    printf("Compass running\n");
+    debug("Compass running\n");
     int16_t xComOff = 0;
     int16_t yComOff = 0;
     while(1){
@@ -833,11 +839,11 @@ void compassTask(void *par){
 //             
 //             vTaskDelay(15/portTICK_PERIOD_MS);
 //         }
-        printf("Rotating in\n...3\n");
+        debug("Rotating in\n...3\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        printf("...2\n");
+        debug("...2\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        printf("...1\n");
+        debug("...1\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         uint8_t movement;
         movement = moveCounterClockwise;
@@ -938,7 +944,7 @@ void compassTask(void *par){
     }
 }
 #endif
-
+*/
 /*  In case of stack overflow, disable all interrupts and handle it  */
 void vApplicationStackOverflowHook(TaskHandle_t *pxTask, signed char *pcTaskName){
     cli();
@@ -986,19 +992,38 @@ int main(void){
     #ifdef DEBUG
         debug("IMU init..\n");
     #endif
+	//vLED_singleHigh(ledGREEN);
     sIMU_begin(); 
-   
+   //vLED_singleLow(ledGREEN);
+	vLED_singleLow(ledRED);
     /* Initialize compass */
     /* Connected with I2C, if the chip has no power, MCU will lock. */
     #ifdef DEBUG
             debug("Compass init..\n");
     #endif
+	// vCOM_init();
     
-    vCOM_init();
-    
-    /* Initialize RTOS utilities  */
+	
+
+	
+	/* ************************************* TESTING **************************************/
+	/*while (1)
+	{
+		vServo_setAngle(0);
+		_delay_ms(5000);
+	}*/
+	
+		
+	
+	
+	
+	
+	/* ************************************* TESTING **************************************/
+	
+	
+	/* Initialize RTOS utilities  */
     movementQ = xQueueCreate(2,sizeof(uint8_t)); // For sending movements to vMainMovementTask
-    poseControllerQ = xQueueCreate(1, sizeof(struct sPolar)); // For setpoints to controller
+    poseControllerQ = xQueueCreate(1, sizeof(struct sPoint)); // For setpoints to controller
     scanStatusQ = xQueueCreate(1,sizeof(uint8_t)); // For robot status
     actuationQ = xQueueCreate(2,sizeof(uint8_t)); // To send variable actuation to motors
     
@@ -1025,22 +1050,21 @@ int main(void){
         debug("Connect to begin!\n");
         xTaskCreate(compassTask, "compasscal", 3500, NULL, 3, NULL); // Task used for compass calibration, dependant on communication and movement task
     #endif
-    
-    
 
     sei();
-    vLED_singleLow(ledRED);
     #ifdef DEBUG
     debug("Starting scheduler ....\n");
     #endif
-    /*  Start scheduler */
+    //  Start scheduler 
     vTaskStartScheduler();
 
-    /*  MCU is out of RAM if the program comes here */
+    //  MCU is out of RAM if the program comes here 
     while(1){
         cli();
         debug("RAM fail\n");
     }
+	
+	
 }
 
 
@@ -1070,14 +1094,15 @@ ISR(nRF51_status){
     if (nRFconnected){
         // indicate we are connected
         vLED_singleHigh(ledGREEN);
-        vLED_singleHigh(ledYELLOW);
+        
     }
     else{
         // We are not connected or lost connection, reset handshake flag
         gHandshook = FALSE;
+		
         gPaused = FALSE;
         vLED_singleLow(ledGREEN);
-        vLED_singleLow(ledYELLOW);
+        vLED_singleHigh(ledYELLOW);
         vLED_singleLow(ledRED);
         xSemaphoreGiveFromISR(xCommandReadyBSem,0); // Let uart parser reset if needed
     }

@@ -3,10 +3,9 @@
 // Author:			Erlend Ese, NTNU Spring 2016
 // Purpose:         Driver USART. Protected printf with mutex.
 /************************************************************************/
-#include <stdio.h>
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <string.h>
 #include "usart.h"
 #include "LED.h"
 /* Baud rate set in defines */
@@ -30,6 +29,10 @@ uint8_t receive_buffer[100];
 /* Set up baud prescale according to datasheet table 17-1 page 174 */
 #define BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16))) - 1)
 
+
+#define loop_until_bit_is_set(sfr,bit) \
+do { } while (bit_is_clear(sfr, bit))
+
 /************************************************************************/
 //Initialize USART driver, note that RXD0/TXD0 (PD0/PD1) is used
 // Note that the nRF51 dongle is limited to send 20 characters
@@ -39,6 +42,13 @@ void vUSART_init(){
     /* Set baud rate, has to match nRF51 dongle! */
     UBRR2H = (unsigned char)(BAUD_PRESCALE>>8);
     UBRR2L = (unsigned char)BAUD_PRESCALE;
+	
+	UBRR0H = (unsigned char)(BAUD_PRESCALE>>8);
+	UBRR0L = (unsigned char)BAUD_PRESCALE;
+
+	UCSR0C = (3 << UCSZ00); /* 8-bit data */
+	UCSR0B = (1 << RXEN0) | (1 << TXEN0);   /* Enable RX and TX */
+
     
     /* RX/TX Complete, data register empty */
     UCSR2A = (1<<RXC2) | (1<<TXC2) | (1<<UDRE2);
@@ -94,7 +104,6 @@ void vUartSendTask(void *pvParamters) {
 		vTaskDelay(10*portTICK_PERIOD_MS);
 	}
 }
-
 
 ISR(USART2_RX_vect){
 	static uint8_t input_buffer[100];

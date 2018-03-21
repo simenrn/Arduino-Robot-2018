@@ -50,6 +50,7 @@ uint8_t server_connect(void) {
 
 uint8_t send_handshake(void) {
   if(!connected) return 0;
+  debug("Send handshake");
   message_t msg;
   msg.type = TYPE_HANDSHAKE;
   msg.message.handshake.name_length = ROBOT_NAME_LENGTH;
@@ -78,6 +79,7 @@ uint8_t send_handshake(void) {
 
 void send_update(int16_t x_cm, int16_t y_cm, int16_t heading_deg, int16_t towerAngle_deg, uint8_t S1_cm, uint8_t S2_cm, uint8_t S3_cm, uint8_t S4_cm){
   if(!connected) return;
+  debug("Send update");
   message_t msg;
   msg.type = TYPE_UPDATE;
   msg.message.update.x = x_cm;
@@ -96,6 +98,7 @@ void send_update(int16_t x_cm, int16_t y_cm, int16_t heading_deg, int16_t towerA
 
 void send_idle(void) {
   if(!connected) return;
+  debug("Send idle");
   uint8_t status = TYPE_IDLE;
   if(use_arq[TYPE_IDLE]) arq_send(server_connection, &status, 1);
   else simple_p_send(SERVER_ADDRESS, &status, 1);
@@ -115,6 +118,7 @@ void debug(const char *fmt, ...) {
 
 void send_ping_response(void) {
   if(!connected) return;
+  debug("Ping Response!");
   uint8_t status = TYPE_PING_RESPONSE;
   if(use_arq[TYPE_PING_RESPONSE]) arq_send(server_connection, &status, 1);
   else simple_p_send(SERVER_ADDRESS, &status, 1);
