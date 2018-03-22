@@ -53,6 +53,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
+#include <util/delay.h>
 
 /* Semaphore handles */
 SemaphoreHandle_t xScanLock;
@@ -160,9 +161,6 @@ void vMainCommunicationTask( void *pvParameters ){
 			command_in = message_in;
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
-			debug("Message received: \n");
-			debug("Orientation: %i", command_in.message.order.orientation);
-			debug("Distance: %i", command_in.message.order.distance);
 			switch(command_in.type){
 				case TYPE_CONFIRM:
 					taskENTER_CRITICAL();
@@ -356,8 +354,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 	float radiusEpsilon = 15; //[mm]The acceptable radius from goal for completion
 	uint8_t lastMovement = 0;
 	
-	uint8_t maxRotateActuation = 75; //The max speed the motors will run at during rotation max is 255
-	uint8_t maxDriveActuation = 100; //The max speed the motors will run at during drive max is 255
+	uint8_t maxRotateActuation = 100; //The max speed the motors will run at during rotation max is 255
+	uint8_t maxDriveActuation = 125; //The max speed the motors will run at during drive max is 255
 	uint8_t currentDriveActuation = maxRotateActuation;
 	
 	/* Controller variables for tuning */
@@ -999,6 +997,17 @@ int main(void){
     
     //vCOM_init();
     
+	uint8_t dummy = 30;
+	uint8_t test = 0;
+	while (1)
+	{
+		vMotorMovementSwitch(-dummy,-dummy,&test,&test);
+		_delay_ms(2000);
+		vMotorMovementSwitch(0,0,&test,&test);
+		_delay_ms(2000);
+	}
+	
+	
     /* Initialize RTOS utilities  */
     movementQ = xQueueCreate(2,sizeof(uint8_t)); // For sending movements to vMainMovementTask
     poseControllerQ = xQueueCreate(1, sizeof(struct sPolar)); // For setpoints to controller

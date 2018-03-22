@@ -1,6 +1,10 @@
 /************************************************************************/
 // File:			servo.c
 // Author:			Erlend Ese, NTNU Spring 2016
+// Modified:		Sondre Jensen, NTNU Spring 2018
+//					Changed DEG_TO_PWM
+//					Definitions for motor control
+//					Definitions for nRF51 pin 20
 // Purpose:         Servo driver for sensor tower
 /************************************************************************/
 
@@ -9,60 +13,64 @@
 
 /*  Custom includes    */
 #include "servo.h"
-#include "defines.h"  
-#include "server_communication.h" 
+#include "defines.h"    
     
 /************************************************************************/
-//     Values found by testing:
-//     0 degrees = 1345, 90 degrees = 2990
+//     Values found by testing and then linearized in matlab
+//     0 degrees = 1300, 90 degrees = 3100
 //     Yields:
-//     Step = (2990-1345)/90degrees = 18.3
+//      y =  20.00*x + 1300
+// MATLAB CODE START
+// n = 90;
+// for i=1:n+1
+//     x(i) = 20.00 * (i-1) + 1300;
+//     array = transpose(round(x));
+// end
+// disp('Check variable array for row-table of pwm values');
+// MATLAB CODE STOP
 // Array index contains corresponding calibrated PWM value.
 /************************************************************************/
 /************************************************************************/
 // Array to map angle from degrees to pulse-width in order to avoid
 // floating point operation. More details in declaration below
 /************************************************************************/
-
-    const uint16_t  DEG_TO_PWM[91] = {
-        1345,1363,1382,1400,1418,1436,1455,1473,1491,1510,1528,1546,
-        1564,1583,1601,1619,1637,1656,1674,1692,1711,1729,1747,1765,
-        1784,1802,1820,1839,1857,1875,1893,1912,1930,1948,1966,1985,
-        2003,2021,2040,2058,2076,2094,2113,2131,2149,2168,2186,2204,
-        2222,2241,2259,2277,2295,2314,2332,2351,2369,2387,2405,2424,
-        2442,2460,2479,2497,2515,2533,2552,2570,2588,2606,2625,2643,
-        2661,2680,2698,2716,2734,2753,2771,2789,2808,2826,2844,2862,
-        2881,2899,2917,2935,2954,2972,2990
-    };
+   const uint16_t  DEG_TO_PWM[91] = {
+	   1300,1320,1340,1360,1380,1400,1420,1440,1460,1480,1500,1520,
+	   1540,1560,1580,1600,1620,1640,1660,1680,1700,1720,1740,1760,
+	   1780,1800,1820,1840,1860,1880,1900,1920,1940,1960,1980,2000,
+	   2020,2040,2060,2080,2100,2120,2140,2160,2180,2200,2220,2240,
+	   2260,2280,2300,2320,2340,2360,2380,2400,2420,2440,2460,2480,
+	   2500,2520,2540,2560,2580,2600,2620,2640,2660,2680,2700,2720,
+	   2740,2760,2780,2800,2820,2840,2860,2880,2900,2920,2940,2960,
+	   2980,3000,3020,3040,3060,3080,3100
+   };
 
 /************************************************************************/
 // Initializes PWM for correct pins and timer for the servo
 // Non-inverted, fast PWM, clear on compare match, 20ms period, presc 8
-// Output: Port H Pin 4
+// Output: PortD Pin 4
 /************************************************************************/
 void vServo_init(uint8_t servoAngleDeg){
     /* Clear OCnA/OCnB on Compare Match, set */
     /* OCnA/OCnB at BOTTOM (non-inverting mode) */
-    /* Datasheet p.155 Table 17-4 */
-    TCCR4A |= (1<<COM4B1) | (0<<COM4B0);
+    /* Datasheet p.132 Table 14-3 */
+   TCCR4A |= (1<<COM4B1) | (0<<COM4B0);
     
     /* Waveform generation mode 14: Fast PWM */
     /* top: ICRn, Update bottom, flag set on top */
-    /* Datasheet p.145 Table 17-2 */
-	
-    TCCR4B |= (1<<WGM43) | (1<<WGM42);                                             
+    /* Datasheet p.133 Table 14-5 */
+    TCCR4B |= (1<<WGM43) | (1<<WGM42);
     TCCR4A |= (1<<WGM41) | (0<<WGM40);
 
     /* Clock select bit description: */
-    /* clkI/O/8 (From prescaler) - Datasheet p.157 Table 17-6*/
-
-     TCCR4B |= (0<<CS42) | (1<<CS41) | (0<<CS40);                                           
+    /* clkI/O/8 (From prescaler) - Datasheet p.134 Table 14-6*/
+    TCCR4B |= (0<<CS42) | (1<<CS41) | (0<<CS40);
     
     /* 50Hz 20ms period => 16Mhz/(8clk*50Hz) - 1 = ICR1] */
     /* Datasheet p.125 */
-    ICR4 = 39999; // 49999 for 20mhz, 39 999 for 16Mhz                                      
+    ICR4 = 39999; // 49999 for 20mhz, 39 999 for 16mhz
     
-    /*Port H Pin 7 as servo PWM Output (OC4B)*/
+    /*PortB Pin 5 as servo PWM Output (OC1A)*/
     servoReg |= (1<<servoPin);
     
     /*  Set angle to desired start angle (usually 0)*/
@@ -74,21 +82,10 @@ void vServo_setAngle(uint8_t ServoAngleDeg){
     /* Ensure feasible values */
     if (ServoAngleDeg >= 90){
         ServoAngleDeg = 90;
-		/* Fetch pulse width from array and set to output */
-		servoOCR = DEG_TO_PWM[ServoAngleDeg];
     }
     else if(ServoAngleDeg <= 0){
         ServoAngleDeg = 0;
-		/* Fetch pulse width from array and set to output */
-		servoOCR = DEG_TO_PWM[ServoAngleDeg];
     }
-	else if ((ServoAngleDeg<90) && (ServoAngleDeg>0))
-	{
-		/* Fetch pulse width from array and set to output */
-		servoOCR = DEG_TO_PWM[ServoAngleDeg];
-	}
-	else{
-		debug("vServo_setAngle input error..");
-	}
-    
+    /* Fetch pulse width from array and set to output */
+    servoOCR = DEG_TO_PWM[ServoAngleDeg];
 }
