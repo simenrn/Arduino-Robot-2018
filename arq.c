@@ -173,7 +173,6 @@ uint8_t arq_close_connection(arq_connection id) {
 uint8_t arq_send(arq_connection id, uint8_t *data, uint16_t len) {
   if(id >= MAX_CONNECTIONS) return 0;
   arq_connection_t *con = &connections[id];
-  
   xSemaphoreTake(con->mutex, portMAX_DELAY);
   
   if(con->status != STATUS_CONNECTED || data == NULL || len == 0 || len > MAX_MESSAGE_SIZE) {
