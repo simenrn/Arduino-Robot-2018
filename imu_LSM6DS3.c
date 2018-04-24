@@ -65,12 +65,12 @@ struct SensorSettings settings;
 // Set as static to tell compiler it will only be used from this file
 status_t sIMU_Init(){
     //Set settings
-    settings.gyroEnabled = 1;   //Can be 0 or 1
-    settings.gyroRange = 500;   //Max deg/s.  Can be: 125, 245, 500, 1000, 2000
-    settings.gyroSampleRate = 1666;   //Hz.  Can be: 13, 26, 52, 104, 208, 416, 833, 1666
-    settings.gyroBandWidth = 400;  //Hz.  Can be: 50, 100, 200, 400;
-    settings.gyroFifoEnabled = 0;  //Set to include gyro in FIFO
-    settings.gyroFifoDecimation = 0;  //set 1 for on /1
+    settings.gyroEnabled = 1;			//Can be 0 or 1
+    settings.gyroRange = 500;			//Max deg/s.  Can be: 125, 245, 500, 1000, 2000
+    settings.gyroSampleRate = 1666;		//Hz.  Can be: 13, 26, 52, 104, 208, 416, 833, 1666
+    settings.gyroBandWidth = 400;		//Hz.  Can be: 50, 100, 200, 400;
+    settings.gyroFifoEnabled = 0;		//Set to include gyro in FIFO
+    settings.gyroFifoDecimation = 0;	//set 1 for on /1
 
     settings.accelEnabled = 1;
     settings.accelODROff = 1;
