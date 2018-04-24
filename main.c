@@ -118,7 +118,10 @@ struct sCartesian{
 };
 
 //dummy test variable
-uint8_t dummy= 0;
+uint8_t dummy1= 0;
+uint8_t dummy2= 0;
+uint8_t dummy3= 0;
+uint8_t dummy4= 0;
 
 /*#define DEBUG*/
 
@@ -133,39 +136,37 @@ uint8_t dummy= 0;
     #define tic PORTH |= (1<<PINH5)
     #define toc PORTH &= ~(1<<PINH5)
 #endif
-
+void vMainPoseControllerTask( void *pvParameters );
 /*  Communication task */
 /*  Communication task */
 void vMainCommunicationTask( void *pvParameters ){
 	// Setup for the communication task
+	
 	struct sCartesian Setpoint = {0,0}; // Struct for setpoints from server
 
 	message_t command_in; // Buffer for recieved messages
 
 	server_communication_init();
-	if(xTaskCreate(vARQTask, "ARQ", 200, NULL, 3, NULL) != pdPASS) {
-		vLED_singleHigh(ledRED);
+	if(xTaskCreate(vARQTask, "ARQ", 300, NULL, 3, NULL) != pdPASS) {
+		//vLED_singleHigh(ledRED);
 	}
 	uint8_t success = 0;
 	
 	while(!success) {
 		success = server_connect();
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
-		vLED_toggle(ledGREEN);
+		//vLED_toggle(ledGREEN);
 	}
 	
 	send_handshake();
 	
 	while(1){
+		
 		if (xSemaphoreTake(xCommandReadyBSem, portMAX_DELAY) == pdTRUE){
 			// We have a new command from the server, copy it to the memory
 			vTaskSuspendAll ();       // Temporarily disable context switching
 			taskENTER_CRITICAL();
 			command_in = message_in;
-			//debug("Message received: \n");
-			//debug("Type: %i", command_in.type);
-			
-			//debug("Distance, Heading: %i %i\n",command_in.message.order.x, command_in.message.order.y);
 			taskEXIT_CRITICAL();
 			xTaskResumeAll ();      // Enable context switching
 			
@@ -183,8 +184,6 @@ void vMainCommunicationTask( void *pvParameters ){
 				case TYPE_ORDER:
 					Setpoint.x = command_in.message.order.x;
 					Setpoint.y = command_in.message.order.y;
-					
-					//debug("order x,y: %f, %f",Setpoint.x,Setpoint.y);
 					/* Relay new coordinates to position controller */
 					xQueueSend(poseControllerQ, &Setpoint, 100);
 					break;
@@ -209,8 +208,11 @@ void vMainCommunicationTask( void *pvParameters ){
 					taskEXIT_CRITICAL();
 					break;
 			}
+			
 			// Command is processed
 		} // if (xCommandReady) end
+		vLED_singleLow(ledYELLOW);
+		//_delay_ms(100);
 	}// While(1) end
 }// vMainComtask end
 
@@ -218,7 +220,7 @@ void vMainCommunicationTask( void *pvParameters ){
 void vMainSensorTowerTask( void *pvParameters){
     /* Task init */
     #ifdef DEBUG
-        printf("Tower OK\n");
+        debug("Tower OK\n");
     #endif 
         
     float thetahat = 0;
@@ -235,12 +237,13 @@ void vMainSensorTowerTask( void *pvParameters){
     int16_t previous_right = 0;
     // Initialize the xLastWakeTime variable with the current time.
     TickType_t xLastWakeTime;
-    
+	
+	uint8_t incr = 0;
     while(1){
-        // Loop
-        if ((gHandshook == TRUE) && (gPaused == FALSE)){
+
+	        if ((gHandshook == TRUE) && (gPaused == FALSE)){
             // xLastWakeTime variable with the current time.
-            xLastWakeTime = xTaskGetTickCount();
+            xLastWakeTime = xTaskGetTickCount(); 
             // Set scanning resolution depending on which movement the robot is executing.
             if (xQueueReceive(scanStatusQ, &robotMovement,150 / portTICK_PERIOD_MS) == pdTRUE){
                 // Set servo step length according to movement, 
@@ -286,7 +289,6 @@ void vMainSensorTowerTask( void *pvParameters){
             if ((idleCounter > 10) && (robotMovement == moveStop)){
                 // If the robot stands idle for 1 second, send 'status:idle' in case the server missed it.
                 send_idle();
-				//debug("idle i vMainSensortask");
                 idleCounter = 1;
             }
             else if ((idleCounter >= 1) && (robotMovement == moveStop)){
@@ -307,7 +309,7 @@ void vMainSensorTowerTask( void *pvParameters){
             
 
 			
-            if ((objectX > 0) && (objectX < 20)){
+            if ((objectX > 0) && (objectX < 25)){
                 // Stop controller
                 struct sCartesian Setpoint = {xhat/10, yhat/10};
 					debug("anti kollisjon");
@@ -316,7 +318,7 @@ void vMainSensorTowerTask( void *pvParameters){
 				
             }
             
-            // Iterate in a increasing/decreasing manner and depending on the robots movement
+            // Iterate in a increasing/decreasign manner and depending on the robots movement
             if ((servoStep*servoResolution <= 90) && (rotationDirection == moveCounterClockwise) && (robotMovement < moveClockwise)){
                 servoStep++;
             }
@@ -346,7 +348,7 @@ void vMainSensorTowerTask( void *pvParameters){
 /*  Calculates new settings for the movement task */
 void vMainPoseControllerTask( void *pvParameters ){
     #ifdef DEBUG
-        printf("PoseController OK\n");
+        debug("PoseController OK\n");
         uint8_t tellar = 0;
     #endif
     /* Task init */    
@@ -390,6 +392,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 	float rightIntError = 0;
 	
 	uint8_t doneTurning = TRUE;
+	volatile int16_t LSpeed = 0;
+	volatile int16_t RSpeed = 0;
 	
 	int16_t leftWheelTicks = 0;
 	int16_t rightWheelTicks = 0;
@@ -404,22 +408,36 @@ void vMainPoseControllerTask( void *pvParameters ){
 	
 	/* TESTING VARIABLES */
 	float distanceStart = 0;
-	float thetaOldDiff = 0;
+	float prevDist= 0;
+	float prevThetaDiff = 0;
 	float StartDiff = 0;
 	float thetahatStart = 0;
 	float xhatStart = 0;
 	float yhatStart = 0;
-	uint8_t initIncrement = 40;
+
 	uint8_t stuckIncrement = 0;
-	uint8_t stuckValueFound = FALSE;
-	uint8_t thetaOldDiffChanged = FALSE;
-//	int sugmeg = 0;
-	uint8_t baseActuation = 35;
+	uint8_t stuckRotInc = 0;
+
+	int sugmeg = 0;
+	uint8_t idlesendtInc = 0;
+	uint8_t baseUpRampActuation = 10;
+	uint8_t baseDownRampActuation = 5;
+	uint8_t bBaseUpRampActFound = FALSE;
+	uint8_t bBaseDownRampActFound = FALSE;
+	uint8_t bBaseRotationSpeed = FALSE;
+	uint8_t baseRotationSpeed = 10;
+	uint8_t starteds = 0;
+	uint8_t blabla = 0;
+	uint8_t printInc = 0;
+	float thetaTraveled = 0;
+    uint8_t newOrder = FALSE;
+	uint8_t initIncrement = 40;
+	uint8_t bStuck = FALSE;
 	
-	uint8_t bBaseActuationFound = FALSE;
-      
+	uint8_t stuckValueFound = FALSE;
+	 
 	while(1){
-		// Checking if server is ready
+		
 		if (gHandshook){
 		
 			ATOMIC_BLOCK(ATOMIC_FORCEON){
@@ -448,125 +466,116 @@ void vMainPoseControllerTask( void *pvParameters ){
 				// Check if a new update is received
 				if (xQueueReceive(poseControllerQ, &Setpoint, 0) == pdTRUE){
 					//xQueueReceive(poseControllerQ, &Setpoint, 20 / portTICK_PERIOD_MS); // Receive theta and radius set points from com task, wait for 20ms if necessary
-					xTargt = Setpoint.x*10;	//Distance is received in cm, convert to mm for continuity
-					yTargt = Setpoint.y*10;	//Distance is received in cm, convert to mm for continuity
+					xTargt = (float)Setpoint.x*10;	//Distance is received in cm, convert to mm for continuity
+					yTargt = (float)Setpoint.y*10;	//Distance is received in cm, convert to mm for continuity
 					thetahatStart = thetahat;
 					xhatStart = xhat;
 					yhatStart = yhat;
 					StartDiff = thetaTargt - thetahatStart;
-					debug("xtargt,ytargt %f, %f", xTargt,yTargt);
-					
+					starteds++;
+					printInc = 0;
+					newOrder = TRUE;
+					stuckRotInc = 0;
 				} 
-				float temp_dist = distance;
+				
+				
+				
+				prevDist = distance;
 				distance = (float)sqrt((xTargt-xhat)*(xTargt-xhat) + (yTargt-yhat)*(yTargt-yhat));
 				
 				xdiff = xTargt - xhat;
 				ydiff = yTargt - yhat;
 				thetaTargt = atan2(ydiff,xdiff); //atan() returns radians
-				thetaOldDiff = thetaDiff;
-				thetaOldDiffChanged = TRUE;
+				
+				prevThetaDiff = thetaDiff;
 				thetaDiff = thetaTargt-thetahat; //Might be outside pi to -pi degrees
 				vFunc_Inf2pi(&thetaDiff);
-				if ((thetaOldDiff-thetaDiff)>(M_PI/2) || ((thetaOldDiff-thetaDiff)<(-M_PI/2)))
+				
+				//Hysteresis mechanics
+				if (fabs(thetaDiff) > rotateThreshold){
+					doneTurning = FALSE;
+				} else if (fabs(thetaDiff) < driveThreshold){
+					doneTurning = TRUE;
+				}
+				
+				if ((prevThetaDiff-thetaDiff)>(M_PI/2) || ((prevThetaDiff-thetaDiff)<(-M_PI/2))) // Gone past target or new target
 				{
 					StartDiff = thetaTargt-thetahat;
-					} else {
-					StartDiff = thetaTargt - thetahatStart;
+					distanceStart = distance;
+				} else {
+					distanceStart = (float)sqrt((xTargt-xhatStart)*(xTargt-xhatStart) + (yTargt-yhatStart)*(yTargt-yhatStart)); // KAN KANSKJE BLI FEIL VED ROTATSJON I STARTEN. ROBOTEN ROTERER IKKE HELT STATISK SÅ XHAT OG YHAT KAN VÆRE FEIL
 				}
 				
 				vFunc_Inf2pi(&StartDiff);
 				StartDiff = fabs(StartDiff);
 				
 				
-				//Hysteresis mechanics
-				if (fabs(thetaDiff) > rotateThreshold){
-					doneTurning = FALSE;
-					
-				}else if (fabs(thetaDiff) < driveThreshold){
-					doneTurning = TRUE;
-					
-				}
-				/*
-				if (doneTurning){
-					if (distance != 0 && temp_dist==distance && distance>radiusEpsilon)
-					{
-						stuckIncrement+=2;
-						if (!bBaseActuationFound){
-							baseActuation += stuckIncrement;
-							stuckIncrement =0;
-							debug("hallo");
-						}
-					} else if (distance!=0){
-						stuckIncrement = 0;
-						bBaseActuationFound = TRUE;
-						debug("hei");
-					}
-				}
-				
-				
-					if (dummy==30){
-						debug("bAct:%i",baseActuation);
-						dummy=0;
-					} else {
-						dummy++;
-					}
-				*/
-				
-				if (thetaOldDiffChanged)
-				{
-					if ((thetaOldDiff-thetaDiff)>(M_PI/2) || ((thetaOldDiff-thetaDiff)<(-M_PI/2))){
-						distanceStart = distance;
-					} else {
-						distanceStart = (float)sqrt((xTargt-xhatStart)*(xTargt-xhatStart) + (yTargt-yhatStart)*(yTargt-yhatStart));
-					}
-				} else {
-					distanceStart = distance;
-				}
-				
 				float shortDistIncRatio = 1.0;
-				float distdiff = distanceStart-distance;
-				speedIncreaseThreshold = 100;
-				if(distanceStart > 0 && distanceStart < (2*speedIncreaseThreshold)){
-					float temp = speedIncreaseThreshold;
-					speedIncreaseThreshold = distanceStart/2;
-					shortDistIncRatio = speedIncreaseThreshold/temp;
+				float shortDistDecRatio = 1.0;
+				if(distanceStart > 0 && distanceStart < (speedIncreaseThreshold+speedDecreaseThreshold)){ // Check if distance is shorter than upramp threshold + downramp threshold
+					float temp_inc = speedIncreaseThreshold;
+					float temp_dec = speedDecreaseThreshold;
+					speedIncreaseThreshold = distanceStart/4; // scale increase threshold to 1/4 of the Start distance
+					speedDecreaseThreshold = distanceStart*3/4; // scale the decrease threshold to 3/4 of the start distance
+					shortDistIncRatio = speedIncreaseThreshold/temp_inc; // ratio of new threshold to original one, used to scale the max actuation to the motors
+					shortDistDecRatio = speedDecreaseThreshold/temp_dec; // ratio of new threshold to original one, used to scale the max actuation to the motors
+				} else {
+					speedDecreaseThreshold = 300;
+					speedIncreaseThreshold = 100;
 				}
-				
-				
 				
 				if(distance > radiusEpsilon){//Not close enough to target
-					
 					//Simple speed controller as the robot nears the target
+					blabla++;
 					
+					float distanceTraveled = distanceStart-distance;
 					
-					if ((distanceStart-distance) >= 0 && (distanceStart-distance) <= speedIncreaseThreshold){
-						currentDriveActuation =	((0.68*(maxDriveActuation*shortDistIncRatio))*(distanceStart-distance)/speedIncreaseThreshold) + (baseActuation+stuckIncrement);
-						if(currentDriveActuation != 35){
-							//debug("xt:%f,xh:%f",xTargt,xhat);
-							//debug("Dis:%f",distance);
+					// Ramp up
+					if (distanceTraveled >= 0 && distanceTraveled <= speedIncreaseThreshold){
+						if (!bBaseUpRampActFound){
+							if (distanceTraveled < 15){
+								baseUpRampActuation++;
+							} else {
+								bBaseUpRampActFound = TRUE;
+								debug("bBaseUp: %i",baseUpRampActuation);
+							}
+						} else if (distance != 0 && prevDist==distance){
+							stuckIncrement++;
+						} else {
+							stuckIncrement = 0;
 						}
+						float minUpDrive = baseUpRampActuation+stuckIncrement;
+						currentDriveActuation =	((((100-minUpDrive)/100)*(maxDriveActuation*shortDistIncRatio))*distanceTraveled/speedIncreaseThreshold) + (baseUpRampActuation+stuckIncrement);
 					}
+					
+					// Ramp down
 					else if (distance < speedDecreaseThreshold){
-						currentDriveActuation = (maxDriveActuation - 0.3*maxDriveActuation)*distance/speedDecreaseThreshold + 0.3*maxDriveActuation; //Reverse proportional + a constant so it reaches.
-						if (distance<10)
-						{
-							debug("Dr: %i",currentDriveActuation);
+						if (distance < 100 && distance >30){
+							if (prevDist==distance){
+								stuckIncrement++;
+							} else {
+								stuckIncrement = 0;
+							}
+							currentDriveActuation = baseUpRampActuation + stuckIncrement;
+						} else {
+							if (prevDist==distance){
+								stuckIncrement= baseUpRampActuation-baseDownRampActuation;
+								baseDownRampActuation += 5;
+							} else {
+								stuckIncrement = 0;
+							}
+							float minDownDrive = (baseDownRampActuation)+stuckIncrement;
+							currentDriveActuation =	((((100-minDownDrive)/100)*(maxDriveActuation*shortDistDecRatio))*(distance/speedDecreaseThreshold)) + ((baseDownRampActuation)+stuckIncrement);
 						}
-						
-						} else	{
+					} else	{
 						currentDriveActuation = maxDriveActuation;
-						debug("3");
+						//currentDriveActuation = baseUpRampActuation;
 					}
-					
+				
 					idleSendt = FALSE;
-					
-					
-					
-					
-					int16_t LSpeed = 0;
-					int16_t RSpeed = 0;
-					
+				
 					if (doneTurning){//Start forward movement
+						//debug("Done Turning");
 						if (thetaDiff >= 0){//Moving left
 							LSpeed = currentDriveActuation - driveKp*fabs(thetaDiff) - driveKi*leftIntError; //Simple PI controller for theta
 							
@@ -598,51 +607,128 @@ void vMainPoseControllerTask( void *pvParameters ){
 						gLeftWheelDirection = motorLeftForward;
 						lastMovement = moveForward;
 						
-						
-						
+			
 					}else{ //Turn within 1 degree of target
-						if (thetaDiff >= 0){//Rotating left
-							LSpeed = -maxRotateActuation*(0.3 + 0.22*(fabs(thetaDiff)));
-							gLeftWheelDirection = motorLeftBackward;
-							RSpeed = maxRotateActuation*(0.3 + 0.22*(fabs(thetaDiff)));
-							gRightWheelDirection = motorRightForward;
-							lastMovement = moveCounterClockwise;
+						thetaTraveled = StartDiff - fabs(thetaDiff);
+						if (!bBaseRotationSpeed ){
+							if ((thetaTraveled <= rotateThreshold/2) || bStuck) {
+								baseRotationSpeed+=2;
+							} else {
+								bBaseRotationSpeed = TRUE;
+								debug("baseRot: %i", baseRotationSpeed);
+							}
+						}
+						if (prevThetaDiff != 0 && prevThetaDiff == thetaDiff && bBaseRotationSpeed){
+							stuckRotInc+=3;
+							//debug("#stuck: %i",stuckRotInc);
+							if (stuckRotInc > 21){
+								bBaseRotationSpeed = FALSE;
+								bStuck = TRUE;
+								baseRotationSpeed += 20;
+								stuckRotInc = 0;
+								debug("stuck! rotSpeed: %i",baseRotationSpeed);
+							}
+						} else {
+							stuckRotInc = 0;
+							bStuck = FALSE;
+							//debug("stuck = 0");
+						}
+						if ( newOrder == TRUE && baseRotationSpeed > 130 )
+						{
+							debug("new order, baseRot: %i", baseRotationSpeed);
+							baseRotationSpeed = 110;
+						}
+						newOrder = FALSE;
+						if (thetaTraveled < (0.4 * StartDiff)) {
+							if (thetaDiff >= 0){//Rotating left
+								LSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+								gLeftWheelDirection = motorLeftBackward;
+								RSpeed = (baseRotationSpeed-10) + stuckRotInc;
+								gRightWheelDirection = motorRightForward;
+								lastMovement = moveCounterClockwise;
 							}else{//Rotating right
-							LSpeed = maxRotateActuation*(0.3 + 0.22*(fabs(thetaDiff)));
-							gLeftWheelDirection = motorLeftForward;
-							RSpeed = -maxRotateActuation*(0.3 + 0.22*(fabs(thetaDiff)));
-							gRightWheelDirection = motorRightBackward;
-							lastMovement = moveClockwise;
-					}
+								LSpeed = (baseRotationSpeed-10) + stuckRotInc;
+								gLeftWheelDirection = motorLeftForward;
+								RSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+								gRightWheelDirection = motorRightBackward;
+								lastMovement = moveClockwise;
+							}
+						} else {
+							if (thetaDiff >= 0){//Rotating left
+								LSpeed = -((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								gLeftWheelDirection = motorLeftBackward;
+								RSpeed = ((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								gRightWheelDirection = motorRightForward;
+								lastMovement = moveCounterClockwise;
+							}else{//Rotating right
+								LSpeed = ((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								gLeftWheelDirection = motorLeftForward;
+								RSpeed = -((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								gRightWheelDirection = motorRightBackward;
+								lastMovement = moveClockwise;
+							}
+							
+						}
 						leftIntError = 0;
 						rightIntError = 0;
 					}
-					
-		/*
-					if (dummy==30){
-						debug("doneTurning: %i, vMotorMovementSwitch(%i,%i)",doneTurning,LSpeed,RSpeed);
-						dummy=0;
-					} else {
-						dummy++;
-					}*/
+				
+					vMotorMovementSwitch(LSpeed,RSpeed, &gLeftWheelDirection, &gRightWheelDirection);
+						/*
+						}else{ //Turn within 1 degree of target
+						//debug("Turning!");
+						if (thetaDiff >= 0){//Rotating left
+							LSpeed = -maxRotateActuation*(0.4 + 0.22*(fabs(thetaDiff)));
+							gLeftWheelDirection = motorLeftBackward;
+							RSpeed = maxRotateActuation*(0.4 + 0.22*(fabs(thetaDiff)));
+							gRightWheelDirection = motorRightForward;
+							lastMovement = moveCounterClockwise;
+						}else{//Rotating right
+							LSpeed = maxRotateActuation*(0.4 + 0.22*(fabs(thetaDiff)));
+							gLeftWheelDirection = motorLeftForward;
+							RSpeed = -maxRotateActuation*(0.4 + 0.22*(fabs(thetaDiff)));
+							gRightWheelDirection = motorRightBackward;
+							lastMovement = moveClockwise;
+						}
+						leftIntError = 0;
+						rightIntError = 0;
+					}
 	
 					vMotorMovementSwitch(LSpeed,RSpeed, &gLeftWheelDirection, &gRightWheelDirection);
-					
+					*/
 				}else{
 					
 					if (idleSendt == FALSE){
 						send_idle();
+						//debug("xhat: %i, yhat: %i",xhat,yhat);
+						idlesendtInc = 0;
+						//vMotorMovementSwitch(-255,-255, &gLeftWheelDirection, &gRightWheelDirection);
 						idleSendt = TRUE;
-						//debug("send idle i vMainPoseControllerTask");
+
 					}
-					//debug("motorbrake");
+					idlesendtInc++;
+					if (prevDist < distance){
+						//vMotorMovementSwitch(-baseUpRampActuation,-baseUpRampActuation, &gLeftWheelDirection, &gRightWheelDirection);
+					}
+					if (printInc==100 && starteds>0){
+						debug("xhat: %i, yhat: %i, theta: %f",xhat,yhat,thetahat);
+						printInc = 0;
+					} else {
+						printInc++;
+					}
 					vMotorBrakeLeft();
 					vMotorBrakeRight();
+
 					lastMovement = moveStop;
 				}
 				xQueueSend(scanStatusQ, &lastMovement, 0); // Send the current movement to the scan task
 			} // No semaphore available, task is blocking
 		} //if(gHandshook) end
+		else{
+			
+			vMotorBrakeLeft();
+			vMotorBrakeRight();
+		}
 	}
 }
 
@@ -654,6 +740,9 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     const TickType_t xDelay = PERIOD_ESTIMATOR_MS;
     float period_in_S = PERIOD_ESTIMATOR_MS / 1000.0f;
     
+	float leftSpeed = 0;
+	float rightSpeed = 0;
+	
     float kalmanGain = 0.5;
     
     float predictedTheta = 0.0;
@@ -689,9 +778,9 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     
     
     #ifdef DEBUG
-        printf("Estimator OK");
-        printf("[%i]",PERIOD_ESTIMATOR_MS);
-        printf("ms\n");   
+        debug("Estimator OK");
+        debug("[%i]",PERIOD_ESTIMATOR_MS);
+        debug("ms\n");   
         uint8_t printerTellar = 0;     
     #endif
     
@@ -717,24 +806,25 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             float dRight =(float)(rightWheelTicks - previous_ticksRight) * WHEEL_FACTOR_MM; // Distance right wheel has traveled since last sample
             previous_ticksLeft = leftWheelTicks;
             previous_ticksRight = rightWheelTicks;
-            	   
+			
+			leftSpeed = dLeft/period_in_S;
+			rightSpeed = dRight/period_in_S;
+			
+			if (dummy3==30)
+			{
+				debug("Left speed: %f, right speed: %f", leftSpeed,rightSpeed);
+				dummy3 = 0;
+			} else {
+				dummy3++;
+			}
+			
             dRobot = (dLeft + dRight) / 2;           
             dTheta = (dRight - dLeft) / WHEELBASE_MM; // Get angle from encoders, dervied from arch of circles formula
-			/*
-			if (dummy==20){
-				debug("dLeft,dRight,dRobot %f,%f,%f",dLeft,dRight,dRobot);
-				dummy=0;
-			} else
-			{
-				dummy++;
-			}
-            */
-			
 			 
             /* PREDICT */
             // Get gyro data:
             float gyrZ = (fIMU_readFloatGyroZ() - gyroOffset);
-            //dTheta = gyrZ * period_in_S * DEG2RAD; [COMMENT]I believe this line is not supposed to be here. Residual from broken encoders?
+           
             
             // If the robot is not really rotating we don't include the gyro measurements, to avoid the trouble with drift while driving in a straight line
             if(fabs(gyrZ) < 10){ 
@@ -792,28 +882,24 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 // If we have a reading over this, we can safely ignore the compass
                 // Ignore compass while driving in a straight line
                 kalmanGain = 0;
-                vLED_singleLow(ledYELLOW);
+                //vLED_singleLow(ledYELLOW);
             }
             else if ((robot_is_turning == FALSE) && (dRobot == 0)){
                 // Updated (a posteriori) state estimate
                 kalmanGain = covariance_filter_predicted / (covariance_filter_predicted + CONST_VARIANCE_COMPASS);
-                vLED_singleHigh(ledYELLOW);
+                //vLED_singleHigh(ledYELLOW);
             }
             else{
                 kalmanGain = 0;
-                vLED_singleLow(ledYELLOW);
+                //vLED_singleLow(ledYELLOW);
             }            
             //*/
            
-            predictedTheta  += kalmanGain*(error);
+            //predictedTheta  += kalmanGain*(error);
 			vFunc_Inf2pi(&predictedTheta);            
             
             // Updated (a posteriori) estimate covariance
             covariance_filter_predicted = (1 - kalmanGain) * covariance_filter_predicted;  
-/*
-			if(predictedX!= gX_hat){
-				debug("predictedx,predictedy,predictedtheta: %f,%f,%f",predictedX,predictedY,predictedTheta);
-			}*/
 
             // Update pose
             xSemaphoreTake(xPoseMutex, 15 / portTICK_PERIOD_MS);
@@ -854,6 +940,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     } // While(1) end
 }
 
+
 /*  In case of stack overflow, disable all interrupts and handle it  */
 void vApplicationStackOverflowHook(TaskHandle_t *pxTask, signed char *pcTaskName){
     cli();
@@ -862,7 +949,7 @@ void vApplicationStackOverflowHook(TaskHandle_t *pxTask, signed char *pcTaskName
        debug("Overflow\n");
     #endif
     while(1){
-        vLED_toggle(ledRED);
+        //vLED_toggle(ledRED);
         //ledPORT ^= (1<<ledGREEN) | (1<<ledYELLOW) | (1<<ledRED);
     }// While(1) end
 }
@@ -871,6 +958,9 @@ void vApplicationStackOverflowHook(TaskHandle_t *pxTask, signed char *pcTaskName
 int main(void){
     /* Setup - Initialize all settings before tasks  */
     /* Initialize LED, pins defined in LED.h   */
+
+	MCUCR &= ~(1<<JTD);
+	volatile size_t heap;
     vLED_init();
     vLED_singleHigh(ledRED); // Set red LED on to indicate INIT is ongoing
     /* Initialize USART driver, NB! baud is dependent on nRF51 dongle */
@@ -890,7 +980,7 @@ int main(void){
         debug("tictoc!\n");
         tic;
     #endif
-    
+	
     /* Initialize servo for sensor tower to zero degrees */
     vServo_init(0);
     /* Initialize sensors */
@@ -910,22 +1000,36 @@ int main(void){
     #endif
 	
     //vCOM_init();
+	/*volatile float dick = 0;
+	while (1)
+	{
+		dick = fIMU_readFloatGyroZ();
+		_delay_ms(2000);
+	}
+	*/
 	
 	/*
-uint8_t lol = 50;
+uint8_t lol = 20;
 uint8_t test = 0;
+volatile uint8_t encL = 0;
+volatile uint8_t encR = 0;
 while (1)
 {
 	vMotorMovementSwitch(lol,lol,&test,&test);
-	_delay_ms(2000);
-	vMotorMovementSwitch(0,0,&test,&test);
-	_delay_ms(2000);
+	
+	encR = gISR_rightWheelTicks;
+	encL = gISR_leftWheelTicks;
+	
+	//vMotorMovementSwitch(-255,-255,&test,&test);
+	//_delay_ms(15);
+//	vMotorMovementSwitch(0,0,&test,&test);
+//	_delay_ms(5000);
 }*/
-
 	
     
     /* Initialize RTOS utilities  */
 
+	heap = xPortGetFreeHeapSize();
     poseControllerQ = xQueueCreate(1, sizeof(struct sCartesian)); // For setpoints to controller
     scanStatusQ = xQueueCreate(1,sizeof(uint8_t)); // For robot status
     actuationQ = xQueueCreate(2,sizeof(uint8_t)); // To send variable actuation to motors
@@ -940,9 +1044,11 @@ while (1)
     // Todo: Check return variable to ensure RTOS utilities were successfully initialized before continue
     
     xTaskCreate(vMainCommunicationTask, "Comm", 300, NULL, 3, NULL); // Dependant on ISR from UART, sends instructions to other tasks
-    xTaskCreate(vMainPoseControllerTask, "PoseCon", 300, NULL, 2, NULL); // Dependant on estimator, sends instructions to movement task
-	xTaskCreate(vMainPoseEstimatorTask, "PoseEst", 300, NULL, 5, NULL); // Independent task, uses ticks from ISR
+    xTaskCreate(vMainPoseControllerTask, "PoseCon", 400, NULL, 2, NULL); // Dependant on estimator, sends instructions to movement task
+	xTaskCreate(vMainPoseEstimatorTask, "PoseEst", 350, NULL, 4, NULL); // Independent task, uses ticks from ISR
     xTaskCreate(vMainSensorTowerTask,"Tower",300, NULL, 1, NULL); // Independent task, but use pose updates from estimator
+
+	heap = xPortGetFreeHeapSize();
 
     sei();
     vLED_singleLow(ledRED);
@@ -951,7 +1057,12 @@ while (1)
     #endif
     /*  Start scheduler */
     vTaskStartScheduler();
-
+	
+	
+	vLED_singleHigh(ledRED);
+	//vLED_singleHigh(ledYELLOW);
+	vLED_singleHigh(ledGREEN);
+	
     /*  MCU is out of RAM if the program comes here */
     while(1){
         cli();
@@ -985,15 +1096,15 @@ ISR(rightWheelCount){
 ISR(nRF51_status){
     if (nRFconnected){
         // indicate we are connected
-        vLED_singleHigh(ledGREEN);
+        //vLED_singleHigh(ledGREEN);
     }
     else{
         // We are not connected or lost connection, reset handshake flag
         gHandshook = FALSE;
         gPaused = FALSE;
-        vLED_singleLow(ledGREEN);
-        vLED_singleLow(ledYELLOW);
-        vLED_singleLow(ledRED);
+        //vLED_singleLow(ledGREEN);
+        //vLED_singleLow(ledYELLOW);
+        //vLED_singleLow(ledRED);
         xSemaphoreGiveFromISR(xCommandReadyBSem,0); // Let uart parser reset if needed
     }
     xSemaphoreGiveFromISR(xControllerBSem,0); // let the controller reset if needed    
