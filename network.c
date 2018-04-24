@@ -7,7 +7,7 @@
 #include "FreeRTOS.h"
 #define ADDRESS         3
 
-void network_receive(uint8_t *frame, uint16_t len);
+void network_receive(uint8_t *frame, uint8_t len);
 
 void (*receive_callbacks[10])(uint8_t, uint8_t*, uint16_t);
 
@@ -49,29 +49,26 @@ uint8_t network_get_address(void) {
   return ADDRESS;
 }
 
-void network_receive(uint8_t *frame, uint16_t len) {
-   uint8_t *decoded_data = pvPortMalloc(len);
-   cobs_decode_result result = cobs_decode(decoded_data, len, frame, len-1);
-   static uint8_t cobs = 0;
-   static uint8_t crc = 0;
-   if(result.status != COBS_DECODE_OK) {
-	   ++cobs;
-	   vPortFree(decoded_data);
-	   return;
-   }
-   if(decoded_data[result.out_len-1] != calculate_crc(decoded_data, result.out_len-1) ) {
-	   ++crc;
-	   vPortFree(decoded_data);
-	   return;
-   }
-   uint8_t receiver = decoded_data[0];
-   uint8_t sender = decoded_data[1];
-   uint8_t protocol = decoded_data[2];
-   if(receiver != ADDRESS) {
-	   vPortFree(decoded_data);
-	   return;
-   }
-   receive_callbacks[protocol](sender, decoded_data+3, result.out_len-4);
-   vPortFree(decoded_data);
+void network_receive(uint8_t *frame, uint8_t len) {
+	uint8_t *decoded_data = pvPortMalloc(len);
+	cobs_decode_result result = cobs_decode(decoded_data, len, frame, len-1);
+	
+	if(result.status != COBS_DECODE_OK) {
+		vPortFree(decoded_data);
+		return;
+	}
+	if(decoded_data[result.out_len-1] != calculate_crc(decoded_data, result.out_len-1) ) {
+		vPortFree(decoded_data);
+		return;
+	}
+	uint8_t receiver = decoded_data[0];
+	uint8_t sender = decoded_data[1];
+	uint8_t protocol = decoded_data[2];
+	if(receiver != ADDRESS) {
+		vPortFree(decoded_data);
+		return;
+	}
+	receive_callbacks[protocol](sender, decoded_data+3, result.out_len-4);
+	vPortFree(decoded_data);
 }
 

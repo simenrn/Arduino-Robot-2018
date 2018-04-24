@@ -21,7 +21,7 @@
 #include "buffer.h"
 
 SemaphoreHandle_t xUartMutex;
-void(*receive_callback)(uint8_t*, uint16_t);
+void(*receive_callback)(uint8_t*, uint8_t);
 void vFrameReaderTask( void *pvParameters );
 void vUartSendTask(void *pvParamters);
 
@@ -68,7 +68,7 @@ void vUSART_send(uint8_t *data, uint16_t len) {
 	xSemaphoreGive(xUartMutex);
 }
 
-void vUSART_set_receive_callback(void(*cb)(uint8_t*, uint16_t)) {
+void vUSART_set_receive_callback(void(*cb)(uint8_t*, uint8_t)) {
 	receive_callback = cb;
 }
 
@@ -77,7 +77,7 @@ void vFrameReaderTask( void *pvParameters ){
 	uint32_t notification_value = 0;
 	while(1){
 		xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &notification_value, portMAX_DELAY);
-		if(receive_callback != NULL) receive_callback(receive_buffer, (uint16_t)notification_value);
+		if(receive_callback != NULL) receive_callback(receive_buffer, (uint8_t)notification_value);
 	}
 }
 
