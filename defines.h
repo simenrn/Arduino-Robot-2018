@@ -31,7 +31,7 @@
  -> (((pi*80)/120)/8 = 0.2617 mm 
                         Length the robot travels per divided tick
                         (Ticks are divided in motor.c)                  */
-#define WHEELBASE_MM             147.0 /* Length between wheel centers  */
+#define WHEELBASE_MM             151.0 /* Length between wheel centers  */
 #define ROBOT_TOTAL_WIDTH_MM     180 /* From outer rim to outer rim		*/
 #define ROBOT_TOTAL_LENGTH_MM    245 /* From front to aft, total		*/
 #define ROBOT_AXEL_OFFSET_MM     56  /* From center of square			*/
@@ -48,7 +48,7 @@
 
 /*
 Wheel factor is the circumference of the wheel divided by ticks per 
-rotation. Motors have a gear ratio of 48:1, and the encoder is attached
+rotation. The motors have a gear ratio of 48:1, and the encoder is attached
 to not geared down shaft with a 8 pole magnet. This means for every full
 rotation of the wheel, the encoder magnet will have 48 full rotations
 with 8 tick per rotation, but we use interrupt only on rising edge so
