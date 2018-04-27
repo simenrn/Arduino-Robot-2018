@@ -101,6 +101,8 @@ message_t message_in;
 float gTheta_hat = 0;
 int16_t gX_hat = 0;
 int16_t gY_hat = 0;
+float gLeft = 0;
+float gRight = 0;
 
 // Global encoder tick values, could probably be replaced by a queue
 volatile int16_t gRightWheelTicks = 0;
@@ -425,7 +427,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 	uint8_t bBaseUpRampActFound = FALSE;
 	uint8_t bBaseDownRampActFound = FALSE;
 	uint8_t bBaseRotationSpeed = FALSE;
-	uint8_t baseRotationSpeed = 10;
+	uint8_t baseRotationSpeed = 20;
 	uint8_t starteds = 0;
 	uint8_t blabla = 0;
 	uint8_t printInc = 0;
@@ -433,6 +435,9 @@ void vMainPoseControllerTask( void *pvParameters ){
     uint8_t newOrder = FALSE;
 	uint8_t initIncrement = 40;
 	uint8_t bStuck = FALSE;
+	
+	float dLeft = 0;
+	float dRight = 0;
 	
 	uint8_t stuckValueFound = FALSE;
 	 
@@ -461,6 +466,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 					thetahat = gTheta_hat;
 					xhat = gX_hat;
 					yhat = gY_hat;
+					dLeft = gLeft;
+					dRight = gRight;
 				xSemaphoreGive(xPoseMutex);
 				
 				// Check if a new update is received
@@ -528,54 +535,62 @@ void vMainPoseControllerTask( void *pvParameters ){
 					//Simple speed controller as the robot nears the target
 					blabla++;
 					
-					float distanceTraveled = distanceStart-distance;
 					
-					// Ramp up
-					if (distanceTraveled >= 0 && distanceTraveled <= speedIncreaseThreshold){
-						if (!bBaseUpRampActFound){
-							if (distanceTraveled < 15){
-								baseUpRampActuation++;
-							} else {
-								bBaseUpRampActFound = TRUE;
-								debug("bBaseUp: %i",baseUpRampActuation);
-							}
-						} else if (distance != 0 && prevDist==distance){
-							stuckIncrement++;
-						} else {
-							stuckIncrement = 0;
-						}
-						float minUpDrive = baseUpRampActuation+stuckIncrement;
-						currentDriveActuation =	((((100-minUpDrive)/100)*(maxDriveActuation*shortDistIncRatio))*distanceTraveled/speedIncreaseThreshold) + (baseUpRampActuation+stuckIncrement);
-					}
-					
-					// Ramp down
-					else if (distance < speedDecreaseThreshold){
-						if (distance < 100 && distance >30){
-							if (prevDist==distance){
-								stuckIncrement++;
-							} else {
-								stuckIncrement = 0;
-							}
-							currentDriveActuation = baseUpRampActuation + stuckIncrement;
-						} else {
-							if (prevDist==distance){
-								stuckIncrement= baseUpRampActuation-baseDownRampActuation;
-								baseDownRampActuation += 5;
-							} else {
-								stuckIncrement = 0;
-							}
-							float minDownDrive = (baseDownRampActuation)+stuckIncrement;
-							currentDriveActuation =	((((100-minDownDrive)/100)*(maxDriveActuation*shortDistDecRatio))*(distance/speedDecreaseThreshold)) + ((baseDownRampActuation)+stuckIncrement);
-						}
-					} else	{
-						currentDriveActuation = maxDriveActuation;
-						//currentDriveActuation = baseUpRampActuation;
-					}
 				
 					idleSendt = FALSE;
 				
 					if (doneTurning){//Start forward movement
 						//debug("Done Turning");
+						stuckRotInc = 0;
+						float distanceTraveled = distanceStart-distance;
+						
+						// Ramp up
+						if (distanceTraveled >= 0 && distanceTraveled <= speedIncreaseThreshold){
+							if (!bBaseUpRampActFound){
+								if (distanceTraveled < 15){
+									baseUpRampActuation++;
+								} else {
+									bBaseUpRampActFound = TRUE;
+									maxDriveActuation = baseUpRampActuation + 10;
+									baseRotationSpeed = baseUpRampActuation;
+									debug("bBaseUp: %i",baseUpRampActuation);
+								}
+							} else if (dLeft == 0 || dRight == 0){
+								stuckIncrement+=2;
+								//debug("stuck fremover!");
+							} else {
+								//stuckIncrement = 0;
+							}
+							//currentDriveActuation = baseUpRampActuation + stuckIncrement;
+							
+							float minUpDrive = baseUpRampActuation+stuckIncrement;
+							currentDriveActuation =	((((100-minUpDrive)/100)*(maxDriveActuation*shortDistIncRatio))*distanceTraveled/speedIncreaseThreshold) + (baseUpRampActuation+stuckIncrement);
+						}
+						
+						// Ramp down
+						else if (distance < speedDecreaseThreshold){
+							if (distance >50){
+								if (dLeft == 0 || dRight == 0){
+									stuckIncrement=2;
+									} else {
+									//stuckIncrement = 0;
+								}
+								currentDriveActuation = baseUpRampActuation + stuckIncrement;
+								} else {
+								if (prevDist==distance){
+									stuckIncrement= baseUpRampActuation-baseDownRampActuation;
+									baseDownRampActuation += 5;
+									} else {
+									//stuckIncrement = 0;
+								}
+								float minDownDrive = (baseDownRampActuation)+stuckIncrement;
+								currentDriveActuation =	((((100-minDownDrive)/100)*(maxDriveActuation*shortDistDecRatio))*(distance/speedDecreaseThreshold)) + ((baseDownRampActuation)+stuckIncrement);
+							}
+							} else	{
+							currentDriveActuation = maxDriveActuation;
+							//currentDriveActuation = baseUpRampActuation;
+						}
+						
 						if (thetaDiff >= 0){//Moving left
 							LSpeed = currentDriveActuation - driveKp*fabs(thetaDiff) - driveKi*leftIntError; //Simple PI controller for theta
 							
@@ -586,6 +601,9 @@ void vMainPoseControllerTask( void *pvParameters ){
 								LSpeed = 0;
 							}
 							RSpeed = currentDriveActuation;
+							if (dLeft == 0){
+								RSpeed = currentDriveActuation + 15;
+							}
 							
 						}else{//Moving right
 							RSpeed = currentDriveActuation - driveKp*fabs(thetaDiff) - driveKi*rightIntError; //Simple PI controller for theta
@@ -596,7 +614,10 @@ void vMainPoseControllerTask( void *pvParameters ){
 							}else if(RSpeed < 0){
 								RSpeed = 0;
 							}
-							LSpeed = currentDriveActuation;	
+							LSpeed = currentDriveActuation;
+							if (dRight == 0){
+								LSpeed = currentDriveActuation + 15;
+							}
 						}
 						
 						leftIntError += thetaDiff;
@@ -609,16 +630,18 @@ void vMainPoseControllerTask( void *pvParameters ){
 						
 			
 					}else{ //Turn within 1 degree of target
+						stuckIncrement = 0;
 						thetaTraveled = StartDiff - fabs(thetaDiff);
 						if (!bBaseRotationSpeed ){
 							if ((thetaTraveled <= rotateThreshold/2) || bStuck) {
-								baseRotationSpeed+=2;
+								baseRotationSpeed++;
 							} else {
 								bBaseRotationSpeed = TRUE;
+								//baseRotationSpeed += 5;
 								debug("baseRot: %i", baseRotationSpeed);
 							}
 						}
-						if (prevThetaDiff != 0 && prevThetaDiff == thetaDiff && bBaseRotationSpeed){
+						if (dLeft==0 ||dRight==0 && bBaseRotationSpeed){
 							stuckRotInc+=3;
 							//debug("#stuck: %i",stuckRotInc);
 							if (stuckRotInc > 21){
@@ -629,29 +652,45 @@ void vMainPoseControllerTask( void *pvParameters ){
 								debug("stuck! rotSpeed: %i",baseRotationSpeed);
 							}
 						} else {
-							stuckRotInc = 0;
+							//stuckRotInc = 0;
 							bStuck = FALSE;
 							//debug("stuck = 0");
 						}
 						if ( newOrder == TRUE && baseRotationSpeed > 130 )
 						{
 							debug("new order, baseRot: %i", baseRotationSpeed);
-							baseRotationSpeed = 110;
+							baseRotationSpeed = 100;
 						}
 						newOrder = FALSE;
-						if (thetaTraveled < (0.4 * StartDiff)) {
-							if (thetaDiff >= 0){//Rotating left
-								LSpeed = -(baseRotationSpeed-10) + stuckRotInc;
-								gLeftWheelDirection = motorLeftBackward;
-								RSpeed = (baseRotationSpeed-10) + stuckRotInc;
-								gRightWheelDirection = motorRightForward;
-								lastMovement = moveCounterClockwise;
-							}else{//Rotating right
-								LSpeed = (baseRotationSpeed-10) + stuckRotInc;
-								gLeftWheelDirection = motorLeftForward;
-								RSpeed = -(baseRotationSpeed-10) + stuckRotInc;
-								gRightWheelDirection = motorRightBackward;
-								lastMovement = moveClockwise;
+						if (thetaTraveled < (0.25 * StartDiff)) {
+							if (!bBaseRotationSpeed){
+								if (thetaDiff >= 0){//Rotating left
+									LSpeed = -(baseRotationSpeed) + stuckRotInc;
+									gLeftWheelDirection = motorLeftBackward;
+									RSpeed = (baseRotationSpeed) + stuckRotInc;
+									gRightWheelDirection = motorRightForward;
+									lastMovement = moveCounterClockwise;
+								}else{//Rotating right
+									LSpeed = (baseRotationSpeed) + stuckRotInc;
+									gLeftWheelDirection = motorLeftForward;
+									RSpeed = -(baseRotationSpeed) + stuckRotInc;
+									gRightWheelDirection = motorRightBackward;
+									lastMovement = moveClockwise;
+								}
+							} else {
+								if (thetaDiff >= 0){//Rotating left
+									LSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+									gLeftWheelDirection = motorLeftBackward;
+									RSpeed = (baseRotationSpeed-10) + stuckRotInc;
+									gRightWheelDirection = motorRightForward;
+									lastMovement = moveCounterClockwise;
+									}else{//Rotating right
+									LSpeed = (baseRotationSpeed-10) + stuckRotInc;
+									gLeftWheelDirection = motorLeftForward;
+									RSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+									gRightWheelDirection = motorRightBackward;
+									lastMovement = moveClockwise;
+								}
 							}
 						} else {
 							if (thetaDiff >= 0){//Rotating left
@@ -669,6 +708,33 @@ void vMainPoseControllerTask( void *pvParameters ){
 							}
 							
 						}
+						/*
+						if (fabs(dLeft) != fabs(dRight)){
+							//debug("dleft:%f, dright:%f",dLeft,dRight);
+							dLeft = fabs(dLeft);
+							dRight = fabs(dRight);
+							if (thetaDiff > 0){
+								if (dLeft > dRight && dRight > 0){
+									LSpeed+=1;
+								} else if (dLeft > dRight && dRight == 0){
+									RSpeed+=1;
+								} else if (dRight > dLeft && dLeft > 0){
+									RSpeed-=1;
+								} else if (dRight > dLeft && dLeft == 0){
+									LSpeed-=1;
+								}
+							} else {
+								if (dLeft > dRight && dRight > 0){
+									LSpeed-=1;
+								} else if (dLeft > dRight && dRight == 0){
+									RSpeed-=1;
+								} else if (dRight > dLeft && dLeft > 0){
+									RSpeed+=1;
+								} else if (dRight > dLeft && dLeft == 0){
+									LSpeed+=1;
+								}
+							}
+						}*/
 						leftIntError = 0;
 						rightIntError = 0;
 					}
@@ -739,10 +805,7 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     
     const TickType_t xDelay = PERIOD_ESTIMATOR_MS;
     float period_in_S = PERIOD_ESTIMATOR_MS / 1000.0f;
-    
-	float leftSpeed = 0;
-	float rightSpeed = 0;
-	
+
     float kalmanGain = 0.5;
     
     float predictedTheta = 0.0;
@@ -801,22 +864,12 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 leftWheelTicks = gLeftWheelTicks;
                 rightWheelTicks = gRightWheelTicks;
             xSemaphoreGive(xTickMutex);
-
+			
             float dLeft = (float)(leftWheelTicks - previous_ticksLeft) * WHEEL_FACTOR_MM; // Distance left wheel has traveled since last sample
             float dRight =(float)(rightWheelTicks - previous_ticksRight) * WHEEL_FACTOR_MM; // Distance right wheel has traveled since last sample
             previous_ticksLeft = leftWheelTicks;
             previous_ticksRight = rightWheelTicks;
 			
-			leftSpeed = dLeft/period_in_S;
-			rightSpeed = dRight/period_in_S;
-			
-			if (dummy3==30)
-			{
-				debug("Left speed: %f, right speed: %f", leftSpeed,rightSpeed);
-				dummy3 = 0;
-			} else {
-				dummy3++;
-			}
 			
             dRobot = (dLeft + dRight) / 2;           
             dTheta = (dRight - dLeft) / WHEELBASE_MM; // Get angle from encoders, dervied from arch of circles formula
@@ -828,12 +881,12 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             
             // If the robot is not really rotating we don't include the gyro measurements, to avoid the trouble with drift while driving in a straight line
             if(fabs(gyrZ) < 10){ 
-                gyroWeight = 0; // Disregard gyro while driving in a straight line
+                gyroWeight = 1; // Disregard gyro while driving in a straight line
                 robot_is_turning = FALSE; // Don't update angle estimates
                 }
             else {
                 robot_is_turning = TRUE;
-                gyroWeight = 0.75; // Found by experiment, after 20x90 degree turns, gyro seems 85% more accurate than encoders
+                gyroWeight = 1; // Found by experiment, after 20x90 degree turns, gyro seems 85% more accurate than encoders
                 
             }
             
@@ -906,7 +959,8 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 gTheta_hat = predictedTheta;
                 gX_hat = predictedX;
                 gY_hat = predictedY;
-				
+				gLeft = dLeft;
+				gRight = dRight;
             xSemaphoreGive(xPoseMutex);
 			
             // Send semaphore to controller
@@ -1009,16 +1063,13 @@ int main(void){
 	*/
 	
 	/*
-uint8_t lol = 20;
+uint8_t lol = 60;
 uint8_t test = 0;
 volatile uint8_t encL = 0;
 volatile uint8_t encR = 0;
 while (1)
 {
-	vMotorMovementSwitch(lol,lol,&test,&test);
-	
-	encR = gISR_rightWheelTicks;
-	encL = gISR_leftWheelTicks;
+	vMotorMovementSwitch(-lol,0,&test,&test);
 	
 	//vMotorMovementSwitch(-255,-255,&test,&test);
 	//_delay_ms(15);
