@@ -418,7 +418,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 	float yhatStart = 0;
 
 	uint8_t stuckIncrement = 0;
-	uint8_t stuckRotInc = 0;
+	uint8_t stuckRotLeft = 0;
+	uint8_t stuckRotRight = 0;
 
 	int sugmeg = 0;
 	uint8_t idlesendtInc = 0;
@@ -482,7 +483,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 					starteds++;
 					printInc = 0;
 					newOrder = TRUE;
-					stuckRotInc = 0;
+					stuckRotLeft = 0;
+					stuckRotRight = 0;
 				} 
 				
 				
@@ -541,7 +543,8 @@ void vMainPoseControllerTask( void *pvParameters ){
 				
 					if (doneTurning){//Start forward movement
 						//debug("Done Turning");
-						stuckRotInc = 0;
+						stuckRotLeft = 0;
+						stuckRotRight = 0;
 						float distanceTraveled = distanceStart-distance;
 						
 						// Ramp up
@@ -630,6 +633,21 @@ void vMainPoseControllerTask( void *pvParameters ){
 						
 			
 					}else{ //Turn within 1 degree of target
+						
+						// Make sure to reset stuck variables if we have gone past target:
+						
+						if (thetaDiff >= 0){//Rotating left
+							if (lastMovement==moveClockwise){
+								stuckRotLeft = 0;
+								stuckRotRight = 0;
+							}
+						}else{//Rotating right
+							if (lastMovement==moveCounterClockwise){
+								stuckRotLeft = 0;
+								stuckRotRight = 0;
+							}
+						}
+						
 						stuckIncrement = 0;
 						thetaTraveled = StartDiff - fabs(thetaDiff);
 						if (!bBaseRotationSpeed ){
@@ -641,14 +659,20 @@ void vMainPoseControllerTask( void *pvParameters ){
 								debug("baseRot: %i", baseRotationSpeed);
 							}
 						}
-						if (dLeft==0 ||dRight==0 && bBaseRotationSpeed){
-							stuckRotInc+=3;
+						if (newOrder == FALSE && dLeft==0 ||dRight==0 && bBaseRotationSpeed){
+							if (dLeft == 0){
+								stuckRotLeft++;
+							}
+							if (dRight == 0){
+								stuckRotRight++;
+							}
 							//debug("#stuck: %i",stuckRotInc);
-							if (stuckRotInc > 21){
+							if (stuckRotLeft > 10 || stuckRotRight > 10){
 								bBaseRotationSpeed = FALSE;
 								bStuck = TRUE;
-								baseRotationSpeed += 20;
-								stuckRotInc = 0;
+								baseRotationSpeed += 10;
+								stuckRotLeft = 0;
+								stuckRotRight = 0;
 								debug("stuck! rotSpeed: %i",baseRotationSpeed);
 							}
 						} else {
@@ -656,53 +680,53 @@ void vMainPoseControllerTask( void *pvParameters ){
 							bStuck = FALSE;
 							//debug("stuck = 0");
 						}
-						if ( newOrder == TRUE && baseRotationSpeed > 130 )
+						if ( newOrder == TRUE && baseRotationSpeed > 100 )
 						{
 							debug("new order, baseRot: %i", baseRotationSpeed);
-							baseRotationSpeed = 100;
+							baseRotationSpeed = 70;
 						}
 						newOrder = FALSE;
 						if (thetaTraveled < (0.25 * StartDiff)) {
 							if (!bBaseRotationSpeed){
 								if (thetaDiff >= 0){//Rotating left
-									LSpeed = -(baseRotationSpeed) + stuckRotInc;
+									LSpeed = -(baseRotationSpeed + stuckRotLeft);
 									gLeftWheelDirection = motorLeftBackward;
-									RSpeed = (baseRotationSpeed) + stuckRotInc;
+									RSpeed = (baseRotationSpeed + stuckRotRight);
 									gRightWheelDirection = motorRightForward;
 									lastMovement = moveCounterClockwise;
 								}else{//Rotating right
-									LSpeed = (baseRotationSpeed) + stuckRotInc;
+									LSpeed = (baseRotationSpeed + stuckRotLeft);
 									gLeftWheelDirection = motorLeftForward;
-									RSpeed = -(baseRotationSpeed) + stuckRotInc;
+									RSpeed = -(baseRotationSpeed + stuckRotRight);
 									gRightWheelDirection = motorRightBackward;
 									lastMovement = moveClockwise;
 								}
 							} else {
 								if (thetaDiff >= 0){//Rotating left
-									LSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+									LSpeed = -(baseRotationSpeed-10 + stuckRotLeft);
 									gLeftWheelDirection = motorLeftBackward;
-									RSpeed = (baseRotationSpeed-10) + stuckRotInc;
+									RSpeed = ((baseRotationSpeed-10) + stuckRotRight);
 									gRightWheelDirection = motorRightForward;
 									lastMovement = moveCounterClockwise;
-									}else{//Rotating right
-									LSpeed = (baseRotationSpeed-10) + stuckRotInc;
+								}else{//Rotating right
+									LSpeed = ((baseRotationSpeed-10) + stuckRotLeft);
 									gLeftWheelDirection = motorLeftForward;
-									RSpeed = -(baseRotationSpeed-10) + stuckRotInc;
+									RSpeed = -((baseRotationSpeed-10) + stuckRotRight);
 									gRightWheelDirection = motorRightBackward;
 									lastMovement = moveClockwise;
 								}
 							}
 						} else {
 							if (thetaDiff >= 0){//Rotating left
-								LSpeed = -((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								LSpeed = -(((baseRotationSpeed-30) + stuckRotLeft) + (30*(4/(3*M_PI))*fabs(thetaDiff)));
 								gLeftWheelDirection = motorLeftBackward;
-								RSpeed = ((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								RSpeed = (((baseRotationSpeed-30) + stuckRotRight) + (30*(4/(3*M_PI))*fabs(thetaDiff)));
 								gRightWheelDirection = motorRightForward;
 								lastMovement = moveCounterClockwise;
 							}else{//Rotating right
-								LSpeed = ((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								LSpeed = (((baseRotationSpeed-30) + stuckRotLeft) + (30*(4/(3*M_PI))*fabs(thetaDiff)));
 								gLeftWheelDirection = motorLeftForward;
-								RSpeed = -((baseRotationSpeed-30) + stuckRotInc) + (30*(4/(3*M_PI))*fabs(thetaDiff));
+								RSpeed = -(((baseRotationSpeed-30) + stuckRotRight) + (30*(4/(3*M_PI))*fabs(thetaDiff)));
 								gRightWheelDirection = motorRightBackward;
 								lastMovement = moveClockwise;
 							}
