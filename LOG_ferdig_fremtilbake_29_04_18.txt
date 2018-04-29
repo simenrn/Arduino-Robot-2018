@@ -1,0 +1,45 @@
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.637958, yhat:0.007314
+xhat:3.189788, yhat:0.036631
+bBaseUp: 68
+xhat:22.329533, yhat:0.121388
+xhat:162.688390, yhat:0.565763
+xhat:444.665890, yhat:1.178842
+xhat:531.865780, yhat:-0.993270
+baseRot: 87
+xhat:528.099000, yhat:1.455520
+xhat:528.609500, yhat:-1.644740
+stuck! rotSpeed: 97
+baseRot: 98
+xhat:528.784240, yhat:0.288539
+xhat:529.803410, yhat:1.036390
+stuck! rotSpeed: 108
+baseRot: 110
+xhat:532.841800, yhat:2.051964
+xhat:507.987030, yhat:0.889948
+xhat:501.611630, yhat:0.652488
+xhat:382.321320, yhat:0.385018
+xhat:107.369850, yhat:-1.740959
+xhat:-32.790260, yhat:2.420021
+stuck! rotSpeed: 80
+baseRot: 92
+xhat:-32.860733, yhat:2.242688
+xhat:-29.577440, yhat:-15.657669
+stuck! rotSpeed: 102
+baseRot: 103
+xhat:-28.921427, yhat:-14.563605
+stuck! rotSpeed: 113
+baseRot: 115
+xhat:-27.581312, yhat:-14.028879
+xhat:-9.413392, yhat:-4.708501
+xhat:-9.413392, yhat:-4.708501

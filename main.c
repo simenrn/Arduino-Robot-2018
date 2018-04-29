@@ -683,7 +683,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 						}
 						if ( newOrder == TRUE && baseRotationSpeed > 100 )
 						{
-							debug("new order, baseRot: %i", baseRotationSpeed);
+							//debug("new order, baseRot: %i", baseRotationSpeed);
 							baseRotationSpeed = 70;
 						}
 						newOrder = FALSE;
@@ -798,15 +798,17 @@ void vMainPoseControllerTask( void *pvParameters ){
 
 					}
 					idlesendtInc++;
+					/*
 					if (prevDist < distance){
 						//vMotorMovementSwitch(-baseUpRampActuation,-baseUpRampActuation, &gLeftWheelDirection, &gRightWheelDirection);
 					}
+					
 					if (printInc==100 && starteds>0){
 						debug("xhat: %i, yhat: %i, theta: %f",xhat,yhat,thetahat);
 						printInc = 0;
 					} else {
 						printInc++;
-					}
+					}*/
 					vMotorBrakeLeft();
 					vMotorBrakeRight();
 
@@ -978,6 +980,14 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             
             // Updated (a posteriori) estimate covariance
             covariance_filter_predicted = (1 - kalmanGain) * covariance_filter_predicted;  
+
+			if (dummy1==25){
+				debug("xhat:%f, yhat:%f",predictedX,predictedY);
+				dummy1=0;
+			} else
+			{
+				dummy1++;
+			}
 
             // Update pose
             xSemaphoreTake(xPoseMutex, 15 / portTICK_PERIOD_MS);

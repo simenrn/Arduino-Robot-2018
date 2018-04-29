@@ -1,0 +1,108 @@
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.000000, yhat:0.000000
+xhat:0.637988, yhat:0.003955
+xhat:4.465950, yhat:0.019438
+bBaseUp: 70
+xhat:84.849808, yhat:-0.463576
+xhat:370.601290, yhat:0.029174
+xhat:524.792050, yhat:1.280531
+xhat:519.717220, yhat:14.869891
+xhat:501.910310, yhat:7.904824
+baseRot: 82
+xhat:506.314700, yhat:8.134781
+xhat:513.808350, yhat:3.451108
+stuck! rotSpeed: 92
+baseRot: 93
+stuck! rotSpeed: 103
+baseRot: 106
+xhat:517.375550, yhat:-0.203652
+xhat:515.555050, yhat:30.190113
+xhat:509.422970, yhat:233.586520
+xhat:501.758700, yhat:494.943630
+xhat:495.124080, yhat:531.126830
+xhat:505.043790, yhat:539.818600
+xhat:502.734310, yhat:511.861110
+stuck! rotSpeed: 80
+xhat:502.641300, yhat:511.229740
+xhat:513.964170, yhat:519.447940
+xhat:415.787750, yhat:515.968690
+xhat:153.788010, yhat:505.913180
+xhat:-9.387836, yhat:500.537990
+xhat:-9.387836, yhat:500.537990
+xhat:-7.474550, yhat:500.600520
+baseRot: 93
+xhat:-0.963205, yhat:502.835690
+stuck! rotSpeed: 103
+baseRot: 105
+xhat:3.105938, yhat:507.706050
+stuck! rotSpeed: 115
+baseRot: 116
+xhat:2.960337, yhat:507.746120
+xhat:2.997973, yhat:422.253050
+xhat:3.040422, yhat:184.927410
+xhat:1.361111, yhat:-16.637291
+xhat:1.611850, yhat:-13.460663
+xhat:1.611850, yhat:-13.460663
+stuck! rotSpeed: 80
+xhat:1.420987, yhat:-14.722305
+baseRot: 98
+xhat:-0.554279, yhat:-19.347672
+xhat:8.295853, yhat:-22.521593
+xhat:10.445914, yhat:11.180834
+xhat:4.818421, yhat:202.496750
+xhat:0.045680, yhat:448.067140
+xhat:-0.778275, yhat:513.133670
+xhat:-1.258406, yhat:509.352940
+xhat:-6.052742, yhat:500.433590
+stuck! rotSpeed: 108
+baseRot: 109
+xhat:-13.658010, yhat:495.841830
+xhat:18.856300, yhat:496.770540
+xhat:217.261440, yhat:498.887450
+xhat:490.313690, yhat:499.397490
+xhat:526.456360, yhat:503.342190
+xhat:528.530820, yhat:495.620360
+xhat:522.077330, yhat:496.486940
+xhat:508.283630, yhat:499.083650
+xhat:508.283630, yhat:499.083650
+xhat:508.283630, yhat:499.083650
+xhat:508.283630, yhat:499.083650
+xhat:508.283630, yhat:499.083650
+stuck! rotSpeed: 80
+xhat:508.283630, yhat:499.082180
+baseRot: 95
+xhat:510.910800, yhat:500.725710
+stuck! rotSpeed: 105
+baseRot: 113
+xhat:511.876740, yhat:501.572850
+xhat:515.664790, yhat:501.517760
+xhat:514.111690, yhat:436.461850
+xhat:508.436310, yhat:235.580580
+xhat:500.589080, yhat:7.348572
+xhat:499.415950, yhat:-7.278427
+xhat:499.415950, yhat:-7.278427
+stuck! rotSpeed: 80
+xhat:500.164120, yhat:-2.883567
+baseRot: 96
+stuck! rotSpeed: 106
+baseRot: 107
+xhat:510.376560, yhat:9.839299
+stuck! rotSpeed: 117
+baseRot: 118
+xhat:502.881160, yhat:4.911099
+xhat:448.650090, yhat:4.724406
+xhat:259.215360, yhat:0.403576
+xhat:23.804085, yhat:0.244467
+xhat:-15.109087, yhat:-0.366223
+xhat:-15.109087, yhat:-0.366223
