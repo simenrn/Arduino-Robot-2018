@@ -485,6 +485,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 					newOrder = TRUE;
 					stuckRotLeft = 0;
 					stuckRotRight = 0;
+					stuckIncrement = 0;
 				} 
 				
 				
@@ -575,21 +576,21 @@ void vMainPoseControllerTask( void *pvParameters ){
 							if (distance >50){
 								if (dLeft == 0 || dRight == 0){
 									stuckIncrement=2;
-									} else {
+								} else {
 									//stuckIncrement = 0;
 								}
 								currentDriveActuation = baseUpRampActuation + stuckIncrement;
-								} else {
+							} else {
 								if (prevDist==distance){
 									stuckIncrement= baseUpRampActuation-baseDownRampActuation;
 									baseDownRampActuation += 5;
-									} else {
+								} else {
 									//stuckIncrement = 0;
 								}
 								float minDownDrive = (baseDownRampActuation)+stuckIncrement;
 								currentDriveActuation =	((((100-minDownDrive)/100)*(maxDriveActuation*shortDistDecRatio))*(distance/speedDecreaseThreshold)) + ((baseDownRampActuation)+stuckIncrement);
 							}
-							} else	{
+						} else	{
 							currentDriveActuation = maxDriveActuation;
 							//currentDriveActuation = baseUpRampActuation;
 						}
