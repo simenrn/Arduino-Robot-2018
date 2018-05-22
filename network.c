@@ -5,7 +5,7 @@
 #include "cobs.h"
 #include "usart.h"
 #include "FreeRTOS.h"
-#define ADDRESS         3
+#define ADDRESS         5
 
 void network_receive(uint8_t *frame, uint8_t len);
 

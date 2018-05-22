@@ -314,7 +314,7 @@ void vMainSensorTowerTask( void *pvParameters){
             if ((objectX > 0) && (objectX < 25)){
                 // Stop controller
                 struct sCartesian Setpoint = {xhat/10, yhat/10};
-					debug("anti kollisjon");
+					//debug("anti kollisjon");
                 xQueueSend(poseControllerQ, &Setpoint, 100);
 				
 				
@@ -543,6 +543,9 @@ void vMainPoseControllerTask( void *pvParameters ){
 					idleSendt = FALSE;
 				
 					if (doneTurning){//Start forward movement
+						
+					
+						
 						//debug("Done Turning");
 						stuckRotLeft = 0;
 						stuckRotRight = 0;
@@ -557,7 +560,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 									bBaseUpRampActFound = TRUE;
 									maxDriveActuation = baseUpRampActuation + 10;
 									baseRotationSpeed = baseUpRampActuation;
-									debug("bBaseUp: %i",baseUpRampActuation);
+									//debug("bBaseUp: %i",baseUpRampActuation);
 								}
 							} else if (dLeft == 0 || dRight == 0){
 								stuckIncrement+=2;
@@ -657,7 +660,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 							} else {
 								bBaseRotationSpeed = TRUE;
 								//baseRotationSpeed += 5;
-								debug("baseRot: %i", baseRotationSpeed);
+								//debug("baseRot: %i", baseRotationSpeed);
 							}
 						}
 						if (newOrder == FALSE && dLeft==0 ||dRight==0 && bBaseRotationSpeed){
@@ -674,7 +677,7 @@ void vMainPoseControllerTask( void *pvParameters ){
 								baseRotationSpeed += 10;
 								stuckRotLeft = 0;
 								stuckRotRight = 0;
-								debug("stuck! rotSpeed: %i",baseRotationSpeed);
+								//debug("stuck! rotSpeed: %i",baseRotationSpeed);
 							}
 						} else {
 							//stuckRotInc = 0;
@@ -866,6 +869,15 @@ void vMainPoseEstimatorTask( void *pvParameters ){
     float gyroWeight = 0.5;//encoderError / (encoderError + gyroError);
     uint8_t robot_is_turning = 0;
     
+	// test variabler
+	float dTheta_enc = 0;
+	float dTheta_gyro = 0;
+	float predictedTheta_enc = 0;
+	float predictedTheta_gyro = 0;
+	float gyrZ = 0;
+	float speed = 0;
+	float prevSpeed = 0;
+	float acceleration = 0;
     
     #ifdef DEBUG
         debug("Estimator OK");
@@ -900,10 +912,19 @@ void vMainPoseEstimatorTask( void *pvParameters ){
 			
             dRobot = (dLeft + dRight) / 2;           
             dTheta = (dRight - dLeft) / WHEELBASE_MM; // Get angle from encoders, dervied from arch of circles formula
-			 
+			
+			dTheta_enc = dTheta;
+			
+			/*acceleration = fIMU_readFloatAccelX();
+			
+			speed = prevSpeed + acceleration*period_in_S;
+			prevSpeed = speed;
+			*/
             /* PREDICT */
             // Get gyro data:
-            float gyrZ = (fIMU_readFloatGyroZ() - gyroOffset);
+			
+			gyrZ = (fIMU_readFloatGyroZ() - gyroOffset);
+			
            
             
             // If the robot is not really rotating we don't include the gyro measurements, to avoid the trouble with drift while driving in a straight line
@@ -916,7 +937,8 @@ void vMainPoseEstimatorTask( void *pvParameters ){
                 gyroWeight = 1; // Found by experiment, after 20x90 degree turns, gyro seems 85% more accurate than encoders
                 
             }
-            
+            dTheta_gyro = gyrZ*period_in_S* DEG2RAD;
+			
             gyrZ *= period_in_S * DEG2RAD; // Scale gyro measurement      
             
 			
@@ -932,6 +954,11 @@ void vMainPoseEstimatorTask( void *pvParameters ){
 
             // Predicted (a priori) state estimate for theta
             predictedTheta += dTheta;
+			
+			predictedTheta_enc += dTheta_enc;
+			predictedTheta_gyro += dTheta_gyro;
+			
+			
                   
             // Predicted (a priori) estimate covariance
             covariance_filter_predicted += variance_gyro_encoder;
@@ -976,18 +1003,25 @@ void vMainPoseEstimatorTask( void *pvParameters ){
             //*/
            
             //predictedTheta  += kalmanGain*(error);
-			vFunc_Inf2pi(&predictedTheta);            
+			vFunc_Inf2pi(&predictedTheta);   
+			
+			vFunc_Inf2pi(&predictedTheta_enc);
+			vFunc_Inf2pi(&predictedTheta_gyro);   
+			
+			predictedTheta_enc *= RAD2DEG;
+			predictedTheta_gyro *= RAD2DEG;      
             
             // Updated (a posteriori) estimate covariance
             covariance_filter_predicted = (1 - kalmanGain) * covariance_filter_predicted;  
-
+/*
 			if (dummy1==25){
-				debug("xhat:%f, yhat:%f",predictedX,predictedY);
+				debug("gyro:%f, enc:%f",predictedTheta_gyro,predictedTheta_enc);
+				//debug("xhat:%f, yhat:%f",predictedX,predictedY);
 				dummy1=0;
 			} else
 			{
 				dummy1++;
-			}
+			}*/
 
             // Update pose
             xSemaphoreTake(xPoseMutex, 15 / portTICK_PERIOD_MS);
@@ -1004,13 +1038,13 @@ void vMainPoseEstimatorTask( void *pvParameters ){
         else{
             // Not connected, getting heading and gyro bias
             uint16_t i;
-            uint16_t samples = 100;
+            uint16_t samples = 300;
             float gyro = 0;
             for (i = 0; i<=samples; i++){
                 gyro+= fIMU_readFloatGyroZ();
             }
 			gyroOffset = gyro / (float)i;   
-
+			vLED_singleHigh(ledYELLOW);
             // Initialize pose to 0 and reset offset variables
 			/*
             predictedX = 0;
